@@ -50,28 +50,28 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
 
         {/* 菜单项 */}
-        <nav className="flex-1 overflow-y-auto py-6 px-4 hide-scrollbar relative z-10">
+        <nav className="flex-1 overflow-y-auto py-6 px-3 hide-scrollbar relative z-10">
           <div className="space-y-2">
           {menuItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-                className={`group flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all duration-300 ${
+                className={`group flex items-center space-x-4 px-6 py-6 rounded-xl transition-all duration-300 w-full ${
                 isActive(item.path)
                     ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
                     : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
               }`}
             >
-                <div className={`p-2 rounded-lg transition-all ${
+                <div className={`p-3 rounded-lg transition-all flex-shrink-0 ${
                   isActive(item.path) 
                     ? 'bg-cyan-500/20 text-cyan-400' 
                     : 'bg-slate-800/50 text-slate-500 group-hover:bg-slate-700/50 group-hover:text-slate-300'
                 }`}>
-              <Icon icon={item.icon} className="text-xl" />
+              <Icon icon={item.icon} className="text-2xl" />
                 </div>
-                <span className="text-sm font-semibold">{item.label}</span>
+                <span className="text-base font-semibold flex-1">{item.label}</span>
                 {isActive(item.path) && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0"></div>
                 )}
             </Link>
           ))}
