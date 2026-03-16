@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LiveMonitor from '../components/features/LiveMonitor';
 import '../styles/dashboard.css';
 
 const Dashboard = () => {
@@ -106,38 +107,7 @@ const Dashboard = () => {
       <div className="dashboard-grid">
         {/* Live Feed */}
         <div className="panel live-feed">
-          <div className="panel-header">
-            <h3 className="panel-title">实时监控</h3>
-            <span className="panel-badge live">LIVE</span>
-          </div>
-          <div className="feed-container">
-            <div className="feed-overlay">
-              <div className="feed-dot"></div>
-              <span className="feed-label">UAV-12 LIVE</span>
-            </div>
-            <div className="feed-camera-info">
-              <div className="feed-info-item">
-                <i data-lucide="plane" style={{width: '12px', height: '12px'}}></i>
-                <span>UAV-12</span>
-              </div>
-              <div className="feed-info-item">
-                <i data-lucide="gauge" style={{width: '12px', height: '12px'}}></i>
-                <span>42 km/h</span>
-              </div>
-              <div className="feed-info-item">
-                <i data-lucide="map-pin" style={{width: '12px', height: '12px'}}></i>
-                <span>22.54°N</span>
-              </div>
-              <div className="feed-info-item">
-                <i data-lucide="battery" style={{width: '12px', height: '12px'}}></i>
-                <span>65%</span>
-              </div>
-            </div>
-            <div className="feed-placeholder">
-              <i data-lucide="video"></i>
-              <span>实时监控画面</span>
-            </div>
-          </div>
+          <LiveMonitor />
         </div>
 
         {/* Patrol Schedule */}

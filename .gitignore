@@ -55,3 +55,9 @@ temp/
 # Build
 *.zip
 *.tar.gz
+
+# Video files
+docs/*.mp4
+docs/*.avi
+docs/*.mov
+docs/*.mkv
