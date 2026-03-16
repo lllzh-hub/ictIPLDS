@@ -1,6 +1,8 @@
 package com.powerinspection.controller;
 
 import com.powerinspection.service.SftpService;
+import com.powerinspection.service.RemoteImportService;
+import com.powerinspection.entity.Defect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,9 @@ public class RemoteImportController {
 
     @Autowired
     private SftpService sftpService;
+
+    @Autowired
+    private RemoteImportService remoteImportService;
 
     @Value("${sftp.remote.path}")
     private String remotePath;
@@ -85,6 +90,49 @@ public class RemoteImportController {
             ));
         } catch (Exception e) {
             logger.error("断开SFTP失败: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/folder/{folderName}")
+    public ResponseEntity<Map<String, Object>> importFolder(@PathVariable String folderName) {
+        logger.info("导入远程文件夹: {}", folderName);
+        try {
+            List<Defect> importedDefects = remoteImportService.importFromFolder(folderName);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "文件夹导入成功，共导入 " + importedDefects.size() + " 条记录",
+                "folder", folderName,
+                "count", importedDefects.size(),
+                "defects", importedDefects
+            ));
+        } catch (Exception e) {
+            logger.error("导入文件夹失败: {}", e.getMessage(), e);
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/all")
+    public ResponseEntity<Map<String, Object>> importAll() {
+        logger.info("导入所有远程数据");
+        try {
+            List<Defect> importedDefects = remoteImportService.importFromAllFolders();
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "所有数据导入成功，共导入 " + importedDefects.size() + " 条记录",
+                "count", importedDefects.size(),
+                "defects", importedDefects
+            ));
+        } catch (Exception e) {
+            logger.error("导入所有数据失败: {}", e.getMessage(), e);
             return ResponseEntity.ok(Map.of(
                 "success", false,
                 "error", e.getMessage()

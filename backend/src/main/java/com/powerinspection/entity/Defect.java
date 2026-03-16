@@ -18,7 +18,7 @@ public class Defect {
     private Long id;
 
     @Column(nullable = false)
-    private String defectName;
+    private String type;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -31,6 +31,30 @@ public class Defect {
 
     @Column(nullable = false)
     private String location;
+
+    @Column(name = "confidence")
+    private Double confidence;
+
+    @Column(name = "original_image", columnDefinition = "LONGTEXT")
+    private String originalImage;
+
+    @Column(name = "detection_image", columnDefinition = "LONGTEXT")
+    private String detectionImage;
+
+    @Column(name = "thermal_image", columnDefinition = "LONGTEXT")
+    private String thermalImage;
+
+    @Column(name = "ai_analysis", columnDefinition = "TEXT")
+    private String aiAnalysis;
+
+    @Column(name = "solution", columnDefinition = "TEXT")
+    private String solution;
+
+    @Column(name = "ai_text_analysis", columnDefinition = "TEXT")
+    private String aiTextAnalysis;
+
+    @Column(name = "ai_text_solution", columnDefinition = "TEXT")
+    private String aiTextSolution;
 
     @Column(name = "image_path")
     private String imagePath;

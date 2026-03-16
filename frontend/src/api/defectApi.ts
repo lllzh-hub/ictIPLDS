@@ -49,8 +49,10 @@ export interface Defect {
   originalImage?: string;  // base64 编码的原图
   detectionImage?: string; // base64 编码的检测框图
   thermalImage?: string;   // base64 编码的红外热力图
-  aiAnalysis?: string;     // AI 分析结果
-  solution?: string;       // 解决方案
+  aiAnalysis?: string;     // 检测框数据（JSON 数组）
+  solution?: string;       // 红外检测框数据（JSON 数组）
+  aiTextAnalysis?: string; // AI 文本分析
+  aiTextSolution?: string; // AI 文本解决方案
 }
 
 export interface DetectionResult {
@@ -131,16 +133,17 @@ export interface AIAnalysisRequest {
 
 export interface AIAnalysisResponse {
   analysis: string;
+  solution: string;
   error?: string;
 }
 
 export const aiApi = {
-  analyzeDefect: async (taskInfo: string): Promise<string> => {
+  analyzeDefect: async (taskInfo: string): Promise<AIAnalysisResponse> => {
     const response = await apiClient.post<AIAnalysisResponse>('/ai/analyze', { taskInfo });
     if (response.data.error) {
       throw new Error(response.data.error);
     }
-    return response.data.analysis;
+    return response.data;
   },
 };
 
