@@ -18,75 +18,58 @@ interface UAV {
 
 const UAVManagement = () => {
   const _navigate = useNavigate();
-  const [uavs, setUavs] = useState<UAV[]>([
-    {
-      id: 'UAV-01',
-      name: '无人机-01',
-      status: 'working',
-      battery: 85,
-      location: { lat: 22.54, lon: 114.05 },
-      altitude: 120,
-      speed: 42,
-      task: 'Zone-A 巡检任务',
-      lastUpdate: new Date().toLocaleTimeString('zh-CN'),
-      imageUrl: 'https://modao.cc/agent-py/media/generated_images/2026-01-21/911f08f59bd34ac8985cc8c6bd527b48.jpg'
-    },
-    {
-      id: 'UAV-02',
-      name: '无人机-02',
-      status: 'standby',
-      battery: 92,
-      location: { lat: 22.58, lon: 114.01 },
-      altitude: 0,
-      speed: 0,
-      lastUpdate: new Date().toLocaleTimeString('zh-CN')
-    },
-    {
-      id: 'UAV-03',
-      name: '无人机-03',
-      status: 'online',
-      battery: 78,
-      location: { lat: 22.56, lon: 114.03 },
-      altitude: 0,
-      speed: 0,
-      lastUpdate: new Date().toLocaleTimeString('zh-CN')
-    },
-    {
-      id: 'UAV-04',
-      name: '无人机-04',
-      status: 'maintenance',
-      battery: 0,
-      location: { lat: 22.50, lon: 114.00 },
-      altitude: 0,
-      speed: 0,
-      lastUpdate: new Date().toLocaleTimeString('zh-CN')
-    },
-    {
-      id: 'UAV-05',
-      name: '无人机-05',
-      status: 'working',
-      battery: 65,
-      location: { lat: 22.52, lon: 114.02 },
-      altitude: 95,
-      speed: 38,
-      task: 'Zone-B 巡检任务',
-      lastUpdate: new Date().toLocaleTimeString('zh-CN')
-    },
-    {
-      id: 'UAV-06',
-      name: '无人机-06',
-      status: 'offline',
-      battery: 0,
-      location: { lat: 22.60, lon: 114.10 },
-      altitude: 0,
-      speed: 0,
-      lastUpdate: '--'
-    }
-  ]);
-
+  const [uavs, setUavs] = useState<UAV[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedUAV, setSelectedUAV] = useState<UAV | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showFlightPathViewer, setShowFlightPathViewer] = useState(false);
+
+  // 从后端获取无人机数据
+  useEffect(() => {
+    const fetchDrones = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/drones');
+        if (!response.ok) throw new Error('获取无人机列表失败');
+        const data = await response.json();
+        
+        // 转换后端数据格式为前端格式
+        const formattedUavs = data.map((drone: any) => ({
+          id: drone.droneId,
+          name: drone.name,
+          status: mapDroneStatus(drone.status),
+          battery: drone.batteryLevel || 0,
+          location: { lat: drone.latitude || 0, lon: drone.longitude || 0 },
+          altitude: 0,
+          speed: 0,
+          task: drone.currentLocation ? `${drone.currentLocation} 巡检任务` : undefined,
+          lastUpdate: new Date().toLocaleTimeString('zh-CN')
+        }));
+        
+        setUavs(formattedUavs);
+      } catch (err) {
+        console.error('获取无人机列表失败:', err);
+        // 如果获取失败，使用空数组
+        setUavs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDrones();
+  }, []);
+
+  // 映射后端状态到前端状态
+  const mapDroneStatus = (status: string): UAV['status'] => {
+    const statusMap: { [key: string]: UAV['status'] } = {
+      'IN_FLIGHT': 'working',
+      'AVAILABLE': 'standby',
+      'CHARGING': 'standby',
+      'MAINTENANCE': 'maintenance',
+      'OFFLINE': 'offline'
+    };
+    return statusMap[status] || 'offline';
+  };
 
   // 更新无人机状态（模拟实时更新）
   useEffect(() => {
@@ -213,6 +196,17 @@ const UAVManagement = () => {
                 </h2>
               </div>
               <div className="p-5 space-y-4 max-h-[calc(100vh-400px)] overflow-y-auto hide-scrollbar">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-12 h-12 border-4 border-slate-700 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
+                    <p className="text-slate-400 text-sm">加载无人机数据中...</p>
+                  </div>
+                ) : filteredUAVs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Icon icon="mdi:quadcopter" className="text-6xl text-slate-700 mb-4" />
+                    <p className="text-slate-400 text-sm">暂无无人机数据</p>
+                  </div>
+                ) : null}
                 {filteredUAVs.map((uav) => {
                   const statusConfig = getStatusConfig(uav.status);
                   const batteryColor = getBatteryColor(uav.battery);

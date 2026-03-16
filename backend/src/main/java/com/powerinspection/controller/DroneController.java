@@ -2,6 +2,7 @@ package com.powerinspection.controller;
 
 import com.powerinspection.entity.Drone;
 import com.powerinspection.service.DroneService;
+import com.powerinspection.util.CharacterEncodingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +54,18 @@ public class DroneController {
     @PostMapping
     public ResponseEntity<Drone> createDrone(@RequestBody Drone drone) {
         logger.info("创建新无人机: {}", drone.getDroneId());
+        
+        // 确保所有字符串字段使用 UTF-8 编码
+        if (drone.getName() != null) {
+            drone.setName(CharacterEncodingUtil.ensureUtf8(drone.getName()));
+        }
+        if (drone.getModel() != null) {
+            drone.setModel(CharacterEncodingUtil.ensureUtf8(drone.getModel()));
+        }
+        if (drone.getCurrentLocation() != null) {
+            drone.setCurrentLocation(CharacterEncodingUtil.ensureUtf8(drone.getCurrentLocation()));
+        }
+        
         Drone createdDrone = droneService.createDrone(drone);
         return ResponseEntity.ok(createdDrone);
     }
@@ -60,6 +73,18 @@ public class DroneController {
     @PutMapping("/{id}")
     public ResponseEntity<Drone> updateDrone(@PathVariable Long id, @RequestBody Drone drone) {
         logger.info("更新无人机信息，ID: {}", id);
+        
+        // 确保所有字符串字段使用 UTF-8 编码
+        if (drone.getName() != null) {
+            drone.setName(CharacterEncodingUtil.ensureUtf8(drone.getName()));
+        }
+        if (drone.getModel() != null) {
+            drone.setModel(CharacterEncodingUtil.ensureUtf8(drone.getModel()));
+        }
+        if (drone.getCurrentLocation() != null) {
+            drone.setCurrentLocation(CharacterEncodingUtil.ensureUtf8(drone.getCurrentLocation()));
+        }
+        
         try {
             Drone updatedDrone = droneService.updateDrone(id, drone);
             return ResponseEntity.ok(updatedDrone);

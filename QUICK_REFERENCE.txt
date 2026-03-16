@@ -1,0 +1,113 @@
+后续数据插入 - 快速参考指南
+
+【核心要点】
+
+✓ 已实现 4 层防护机制
+✓ 所有新数据自动使用 UTF-8 编码
+✓ 无需手动处理编码问题
+
+【快速检查清单】
+
+部署前:
+□ 后端服务已重启
+□ 4 个新文件已编译
+□ 数据库表字符集为 utf8
+
+部署后:
+□ 访问 /api/drones 能正常获取数据
+□ 无人机名称显示正常（无乱码）
+□ 可以通过 API 添加新无人机
+
+【添加新数据的方式】
+
+方式 1: 通过前端 UI (推荐)
+→ 自动处理所有编码问题
+→ 最安全可靠
+
+方式 2: 通过 API 请求
+→ 确保 Content-Type 包含 charset=utf-8
+→ 后端自动验证和清理数据
+
+方式 3: 通过 SQL 脚本
+→ 脚本开头添加: SET NAMES utf8;
+→ 执行时添加: --default-character-set=utf8
+
+【防护机制说明】
+
+1. WebConfig
+   → 确保 HTTP 响应使用 UTF-8
+
+2. CharacterEncodingFilter
+   → 拦截所有请求，设置 UTF-8 编码
+
+3. CharacterEncodingUtil
+   → 验证和清理字符串数据
+
+4. DroneController
+   → 在保存前调用工具类验证
+
+【验证新数据】
+
+添加后检查:
+1. 数据库: SELECT * FROM drones WHERE drone_id = 'UAV-XX';
+2. API: GET /api/drones/drone-id/UAV-XX
+3. 前端: 打开无人机管理页面查看
+
+【常见操作】
+
+添加新无人机:
+POST /api/drones
+{
+  "droneId": "UAV-05",
+  "name": "无人机-05",
+  "model": "DJI M300 RTK",
+  "batteryLevel": 90,
+  "latitude": 22.57,
+  "longitude": 114.07,
+  "flightHours": 110
+}
+
+更新无人机:
+PUT /api/drones/{id}
+{
+  "name": "无人机-05-新名称",
+  ...
+}
+
+删除无人机:
+DELETE /api/drones/{id}
+
+【问题排查】
+
+乱码问题:
+1. 检查 application.properties 中的编码配置
+2. 重启后端服务
+3. 清空浏览器缓存
+4. 检查数据库表字符集
+
+连接问题:
+1. 确认 MySQL 服务运行
+2. 检查数据库连接字符串
+3. 查看后端启动日志
+
+【文件位置】
+
+配置文件:
+- backend/src/main/resources/application.properties
+
+新增文件:
+- backend/src/main/java/com/powerinspection/config/WebConfig.java
+- backend/src/main/java/com/powerinspection/filter/CharacterEncodingFilter.java
+- backend/src/main/java/com/powerinspection/util/CharacterEncodingUtil.java
+
+更新文件:
+- backend/src/main/java/com/powerinspection/controller/DroneController.java
+
+【下一步】
+
+1. 重新编译后端代码
+2. 重启后端服务
+3. 测试添加新无人机
+4. 验证前端显示正常
+
+完成后，系统将完全防护，不会再出现乱码问题！
