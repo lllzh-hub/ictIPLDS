@@ -105,8 +105,8 @@ const LiveMonitor = () => {
     const uavNumber = uavId.split('-')[1];
     if (uavNumber) {
       const paddedNumber = uavNumber.padStart(4, '0');
-      // 从后端获取视频文件，使用相对路径
-      const defaultVideoPath = `/docs/${paddedNumber}.mp4`;
+      // 从后端 API 获取视频文件流
+      const defaultVideoPath = `http://localhost:8080/api/video/stream/${paddedNumber}.mp4`;
       return { url: defaultVideoPath, type: 'file' };
     }
 
