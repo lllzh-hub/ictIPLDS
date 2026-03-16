@@ -50,7 +50,7 @@ public class DefectServiceImpl implements DefectService {
 
     @Override
     public Defect createDefect(Defect defect) {
-        log.info("创建新缺陷: {}", defect.getDefectName());
+        log.info("创建新缺陷: {}", defect.getType());
         defect.setCreatedAt(LocalDateTime.now());
         defect.setUpdatedAt(LocalDateTime.now());
         return defectRepository.save(defect);
@@ -60,8 +60,8 @@ public class DefectServiceImpl implements DefectService {
     public Defect updateDefect(Long id, Defect defect) {
         log.info("更新缺陷信息，ID: {}", id);
         return defectRepository.findById(id).map(existingDefect -> {
-            if (defect.getDefectName() != null) {
-                existingDefect.setDefectName(defect.getDefectName());
+            if (defect.getType() != null) {
+                existingDefect.setType(defect.getType());
             }
             if (defect.getDescription() != null) {
                 existingDefect.setDescription(defect.getDescription());
@@ -74,6 +74,24 @@ public class DefectServiceImpl implements DefectService {
             }
             if (defect.getLocation() != null) {
                 existingDefect.setLocation(defect.getLocation());
+            }
+            if (defect.getConfidence() != null) {
+                existingDefect.setConfidence(defect.getConfidence());
+            }
+            if (defect.getOriginalImage() != null) {
+                existingDefect.setOriginalImage(defect.getOriginalImage());
+            }
+            if (defect.getDetectionImage() != null) {
+                existingDefect.setDetectionImage(defect.getDetectionImage());
+            }
+            if (defect.getThermalImage() != null) {
+                existingDefect.setThermalImage(defect.getThermalImage());
+            }
+            if (defect.getAiAnalysis() != null) {
+                existingDefect.setAiAnalysis(defect.getAiAnalysis());
+            }
+            if (defect.getSolution() != null) {
+                existingDefect.setSolution(defect.getSolution());
             }
             if (defect.getImagePath() != null) {
                 existingDefect.setImagePath(defect.getImagePath());

@@ -25,10 +25,23 @@ public class AIController {
             logger.info("接收到AI分析请求，来源IP: {}", getClientIp(request));
             logger.debug("请求内容: {}", taskInfo);
             
-            String analysis = aiService.analyzeDefect(taskInfo);
+            String fullAnalysis = aiService.analyzeDefect(taskInfo);
+            
+            // 分离 AI 分析和解决方案
+            String analysis = fullAnalysis;
+            String solution = "";
+            
+            if (fullAnalysis.contains("---SOLUTION_SPLIT---")) {
+                String[] parts = fullAnalysis.split("---SOLUTION_SPLIT---");
+                analysis = parts[0].trim();
+                solution = parts.length > 1 ? parts[1].trim() : "";
+            }
             
             logger.info("AI分析成功完成");
-            return ResponseEntity.ok(Map.of("analysis", analysis));
+            return ResponseEntity.ok(Map.of(
+                "analysis", analysis,
+                "solution", solution
+            ));
         } catch (Exception e) {
             logger.error("AI分析失败: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()

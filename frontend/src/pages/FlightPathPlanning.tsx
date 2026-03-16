@@ -8,16 +8,41 @@ import {
 } from '../utils/flightPath';
 
 const AMAP_KEY = 'a0c628a7cbe0de2e9ec5a3f548854b58';
-const AMAP_URL = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor`;
 
-const DEFAULT_PATH: LngLat[] = [
-  [116.362209, 39.887487],
-  [116.422897, 39.878002],
-  [116.392105, 39.90651],
-  [116.372105, 39.91751],
-  [116.362105, 39.93751],
-  [116.362209, 39.887487],
-];
+// 武汉附近坐标
+const WUHAN_CENTER: LngLat = [114.305, 30.593];
+
+// 生成随机巡检区域（矩形）
+const generateRandomInspectionArea = (center: LngLat, index: number): LngLat[] => {
+  const seed = index * 12345;
+  const random = (offset: number) => {
+    const x = Math.sin(seed + offset) * 10000;
+    return x - Math.floor(x);
+  };
+  
+  // 随机偏移（相对于中心点，单位：0.01度 ≈ 1km）
+  const offsetLng = (random(1) - 0.5) * 0.08;
+  const offsetLat = (random(2) - 0.5) * 0.08;
+  
+  // 随机大小（0.02-0.05度）
+  const width = 0.02 + random(3) * 0.03;
+  const height = 0.02 + random(4) * 0.03;
+  
+  const centerLng = center[0] + offsetLng;
+  const centerLat = center[1] + offsetLat;
+  
+  const path: LngLat[] = [
+    [centerLng - width / 2, centerLat - height / 2],
+    [centerLng + width / 2, centerLat - height / 2],
+    [centerLng + width / 2, centerLat + height / 2],
+    [centerLng - width / 2, centerLat + height / 2],
+    [centerLng - width / 2, centerLat - height / 2], // 闭合
+  ];
+  
+  return path;
+};
+
+const DEFAULT_PATH: LngLat[] = generateRandomInspectionArea(WUHAN_CENTER, 0);
 
 const DEFAULT_GEOJSON = JSON.stringify(
   {
@@ -84,7 +109,7 @@ export default function FlightPathPlanning() {
 
   const [path, setPath] = useState<LngLat[]>(DEFAULT_PATH);
   const [geojsonText, setGeojsonText] = useState(DEFAULT_GEOJSON);
-  const [startPoint, setStartPoint] = useState<LngLat>([116.352209, 39.867487]);
+  const [startPoint, setStartPoint] = useState<LngLat>(WUHAN_CENTER);
   const [endPoint, setEndPoint] = useState<LngLat | null>(null);
   const [spacing, setSpacing] = useState(350);
   const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal');
@@ -104,6 +129,9 @@ export default function FlightPathPlanning() {
     path: [],
     waypoints: [],
   });
+  const [droneIndex, setDroneIndex] = useState(0);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState<LngLat[]>([]);
 
   const polygonPath =
     path.length > 1 &&
@@ -182,12 +210,13 @@ export default function FlightPathPlanning() {
 
     const loadAMap = () => {
       return new Promise<void>((resolve, reject) => {
+        // 强制删除已加载的 AMap，确保重新加载
         if (window.AMap) {
-          resolve();
-          return;
+          delete (window as any).AMap;
         }
+        
         const script = document.createElement('script');
-        script.src = AMAP_URL;
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor&_t=${Math.random()}`;
         script.async = true;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('AMap load failed'));
@@ -199,8 +228,8 @@ export default function FlightPathPlanning() {
       .then(() => {
         const AMap = window.AMap;
         const map = new AMap.Map(containerRef.current!, {
-          center: [116.395577, 39.892257],
-          zoom: 14,
+          center: WUHAN_CENTER,
+          zoom: 13,
           // 方案A：开启 3D 视角（倾斜观察），航线仍按 2D 绘制
           viewMode: '3D',
           pitch: 55,
@@ -216,9 +245,16 @@ export default function FlightPathPlanning() {
           fillColor: '#3b82f6',
           fillOpacity: 0.3,
           zIndex: 50,
+          draggable: true,
         });
         polygonRef.current = polygon;
         map.add(polygon);
+
+        // 监听多边形拖动事件
+        polygon.on('change', () => {
+          const newPath = polygon.getPath();
+          setPath(newPath);
+        });
 
         const initialResult = generateFlightPath(
           polygonPath,
@@ -248,6 +284,23 @@ export default function FlightPathPlanning() {
           const ev = e as { lnglat: { getLng(): number; getLat(): number } };
           const lnglat = ev.lnglat;
           const coords: LngLat = [lnglat.getLng(), lnglat.getLat()];
+          
+          // 绘制模式
+          if (isDrawingMode) {
+            const newPoints = [...drawingPoints, coords];
+            setDrawingPoints(newPoints);
+            
+            // 显示绘制点
+            const marker = new window.AMap.Marker({
+              position: coords,
+              offset: new window.AMap.Pixel(-10, -10),
+              content: `<div class="rounded-full border-2 border-emerald-500 bg-white px-2 py-0.5 text-emerald-600 font-bold text-xs">${newPoints.length}</div>`,
+              zIndex: 52,
+            });
+            marker.setMap(map);
+            return;
+          }
+          
           if (isPickingStartRef.current) {
             setStartPoint(coords);
             if (startMarkerRef.current) {
@@ -461,6 +514,36 @@ export default function FlightPathPlanning() {
     ? Math.round(calculatePathLength(flightData.path))
     : 0;
 
+  const generateRandomArea = () => {
+    const newPath = generateRandomInspectionArea(WUHAN_CENTER, droneIndex);
+    setPath(newPath);
+    setDroneIndex(droneIndex + 1);
+    mapRef.current?.setFitView();
+  };
+
+  const startDrawing = () => {
+    setIsDrawingMode(true);
+    setDrawingPoints([]);
+  };
+
+  const finishDrawing = () => {
+    if (drawingPoints.length < 3) {
+      alert('至少需要3个点来形成区域');
+      return;
+    }
+    // 闭合多边形
+    const closedPath = [...drawingPoints, drawingPoints[0]];
+    setPath(closedPath);
+    setIsDrawingMode(false);
+    setDrawingPoints([]);
+    mapRef.current?.setFitView();
+  };
+
+  const cancelDrawing = () => {
+    setIsDrawingMode(false);
+    setDrawingPoints([]);
+  };
+
   return (
     <div className="relative h-full min-h-[calc(100vh-4rem)] w-full bg-slate-950">
       {/* 左侧面板 */}
@@ -471,6 +554,54 @@ export default function FlightPathPlanning() {
 
         <div className="space-y-4 border-b border-slate-700/50 p-4">
           <div className="text-sm font-semibold text-slate-200">目标区域设置</div>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={generateRandomArea}
+              className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 py-2.5 text-sm font-semibold text-white transition hover:from-purple-500 hover:to-pink-500 flex items-center justify-center gap-2"
+            >
+              <Icon icon="heroicons:sparkles" />
+              随机生成巡检区域
+            </button>
+            <button
+              onClick={startDrawing}
+              disabled={isDrawingMode}
+              className={`w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition ${
+                isDrawingMode
+                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/50'
+                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500'
+              }`}
+            >
+              <Icon icon="heroicons:pencil-square" />
+              自定义绘制区域
+            </button>
+          </div>
+          
+          {isDrawingMode && (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 space-y-2">
+              <p className="text-xs text-emerald-400 font-semibold">绘制模式已启用</p>
+              <p className="text-xs text-slate-400">在地图上点击添加区域顶点（至少3个点）</p>
+              <p className="text-xs text-emerald-400">已添加 {drawingPoints.length} 个点</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={finishDrawing}
+                  disabled={drawingPoints.length < 3}
+                  className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold py-1.5 transition"
+                >
+                  完成绘制
+                </button>
+                <button
+                  onClick={cancelDrawing}
+                  className="flex-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold py-1.5 transition"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="text-xs text-slate-400 text-center">
+            点击多边形可拖动编辑区域
+          </div>
           <textarea
             value={geojsonText}
             onChange={(e) => setGeojsonText(e.target.value)}
@@ -481,7 +612,7 @@ export default function FlightPathPlanning() {
             onClick={applyGeojson}
             className="w-full rounded-lg border border-slate-600 bg-slate-800 py-2 text-sm font-medium text-slate-200 transition hover:border-sky-500 hover:bg-slate-700"
           >
-            应用
+            应用 GeoJSON
           </button>
         </div>
 

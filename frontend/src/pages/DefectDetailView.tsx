@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { defectApi, type Defect } from '../api/defectApi';
+import { defectApi, aiApi, type Defect } from '../api/defectApi';
 import Icon from '../components/common/Icon';
 
 const DefectDetailView = () => {
@@ -9,6 +9,9 @@ const DefectDetailView = () => {
   const [defect, setDefect] = useState<Defect | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState<'original' | 'detection' | 'thermal'>('original');
+  const [analyzing, setAnalyzing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (id) {
@@ -16,11 +19,52 @@ const DefectDetailView = () => {
     }
   }, [id]);
 
+  // 当切换图片时，重新绘制
+  useEffect(() => {
+    if (activeImage === 'detection' && defect?.detectionImage && defect?.aiAnalysis) {
+      // 延迟一下确保 canvas 已经挂载
+      setTimeout(() => {
+        drawDetectionBoxes(defect.detectionImage, defect.aiAnalysis);
+      }, 100);
+    } else if (activeImage === 'thermal' && defect?.thermalImage && defect?.solution) {
+      setTimeout(() => {
+        drawDetectionBoxes(defect.thermalImage, defect.solution);
+      }, 100);
+    }
+  }, [activeImage, defect]);
+
   const loadDefect = async (defectId: number) => {
     setLoading(true);
     try {
       const data = await defectApi.getDefectById(defectId);
+      
+      // 如果没有 AI 文本分析，自动生成默认分析
+      if (!data.aiTextAnalysis) {
+        try {
+          const taskInfo = `缺陷类型: ${data.type}\n位置: ${data.location}\n严重程度: ${data.severity}\n描述: ${data.description || '无'}`;
+          const result = await aiApi.analyzeDefect(taskInfo);
+          data.aiTextAnalysis = result.analysis;
+          data.aiTextSolution = result.solution;
+          
+          // 保存到后端
+          if (data.id) {
+            await defectApi.updateDefect(data.id, data);
+          }
+        } catch (error) {
+          console.error('自动生成 AI 分析失败:', error);
+        }
+      }
+      
       setDefect(data);
+      
+      // 设置初始显示的图片
+      if (data.originalImage) {
+        setActiveImage('original');
+      } else if (data.detectionImage) {
+        setActiveImage('detection');
+      } else if (data.thermalImage) {
+        setActiveImage('thermal');
+      }
     } catch (error) {
       console.error('加载缺陷详情失败:', error);
       alert('加载失败，请检查后端服务');
@@ -79,7 +123,167 @@ const DefectDetailView = () => {
     }
   };
 
-  // 处理图片源（支持 URL）
+  const handleAIAnalysis = async () => {
+    if (!defect) return;
+    
+    setAnalyzing(true);
+    try {
+      const taskInfo = `缺陷类型: ${defect.type}\n位置: ${defect.location}\n严重程度: ${defect.severity}\n描述: ${defect.description || '无'}`;
+      const result = await aiApi.analyzeDefect(taskInfo);
+      
+      if (defect.id) {
+        await defectApi.updateDefect(defect.id, {
+          ...defect,
+          aiTextAnalysis: result.analysis,
+          aiTextSolution: result.solution
+        });
+        setDefect({ 
+          ...defect, 
+          aiTextAnalysis: result.analysis,
+          aiTextSolution: result.solution
+        });
+      }
+    } catch (error) {
+      console.error('AI 分析失败:', error);
+      alert('AI 分析失败，请检查后端服务');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // 绘制检测框
+  const drawDetectionBoxes = (imageData: string | undefined, jsonData: string | undefined) => {
+    if (!imageData || !jsonData) {
+      console.warn('缺少图片或检测数据');
+      return;
+    }
+
+    try {
+      const detections = JSON.parse(jsonData);
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        console.warn('Canvas 引用不存在');
+        return;
+      }
+      
+      const imageSrc = getImageSrc(imageData);
+      console.log('加载图片:', imageSrc);
+      
+      // 先清空 canvas
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        try {
+          console.log('图片加载成功，原始尺寸:', img.width, 'x', img.height);
+          
+          // 获取容器尺寸
+          const container = canvas.parentElement;
+          if (!container) {
+            console.error('容器不存在');
+            return;
+          }
+          
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+          console.log('容器尺寸:', containerWidth, 'x', containerHeight);
+          
+          // 计算缩放比例，保持宽高比
+          const imgAspect = img.width / img.height;
+          const containerAspect = containerWidth / containerHeight;
+          
+          let canvasWidth, canvasHeight;
+          if (imgAspect > containerAspect) {
+            // 图片更宽
+            canvasWidth = containerWidth;
+            canvasHeight = containerWidth / imgAspect;
+          } else {
+            // 图片更高
+            canvasHeight = containerHeight;
+            canvasWidth = containerHeight * imgAspect;
+          }
+          
+          console.log('Canvas 尺寸:', canvasWidth, 'x', canvasHeight);
+          
+          // 设置 canvas 的实际绘制尺寸（内部分辨率）
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          // 设置 canvas 的显示尺寸（CSS）
+          canvas.style.width = canvasWidth + 'px';
+          canvas.style.height = canvasHeight + 'px';
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            console.error('无法获取 canvas context');
+            return;
+          }
+          
+          // 绘制图片
+          ctx.drawImage(img, 0, 0);
+          console.log('图片已绘制到 canvas');
+          
+          // 绘制检测框
+          if (Array.isArray(detections)) {
+            console.log('绘制检测框，数量:', detections.length);
+            detections.forEach((detection: any, idx: number) => {
+              let x1, y1, x2, y2;
+              
+              if (detection.bbox_xyxy && Array.isArray(detection.bbox_xyxy)) {
+                [x1, y1, x2, y2] = detection.bbox_xyxy;
+              } else if (detection.bbox && Array.isArray(detection.bbox)) {
+                const [x, y, w, h] = detection.bbox;
+                x1 = x;
+                y1 = y;
+                x2 = x + w;
+                y2 = y + h;
+              } else {
+                console.warn('检测框 ' + idx + ' 格式不支持:', detection);
+                return;
+              }
+              
+              console.log('绘制框 ' + idx + ':', x1, y1, x2, y2);
+              
+              // 绘制矩形框
+              ctx.strokeStyle = '#00ff00';
+              ctx.lineWidth = 2;
+              ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+              
+              // 绘制标签
+              const label = detection.class_name || detection.type || '检测';
+              const confidence = detection.score ? (detection.score * 100).toFixed(1) : '0';
+              const text = `${label} ${confidence}%`;
+              
+              ctx.fillStyle = '#00ff00';
+              ctx.font = 'bold 14px Arial';
+              const textWidth = ctx.measureText(text).width;
+              ctx.fillRect(x1, y1 - 25, textWidth + 10, 25);
+              
+              ctx.fillStyle = '#000000';
+              ctx.fillText(text, x1 + 5, y1 - 8);
+            });
+          }
+        } catch (error) {
+          console.error('绘制过程中出错:', error);
+        }
+      };
+      
+      img.onerror = (e) => {
+        console.error('图片加载失败:', imageSrc, e);
+      };
+      
+      img.src = imageSrc;
+    } catch (error) {
+      console.error('绘制检测框失败:', error);
+    }
+  };
+
+  // 处理图片源（支持 URL 和 Base64）
   const getImageSrc = (imageData: string | undefined): string => {
     if (!imageData) return '';
     
@@ -88,9 +292,31 @@ const DefectDetailView = () => {
       return imageData;
     }
     
+    // 如果是 Base64 数据（JPEG 开头），添加前缀
+    if (imageData.startsWith('/9j/') || imageData.startsWith('iVBORw0KGgo')) {
+      // /9j/ 是 JPEG Base64 的开头
+      // iVBORw0KGgo 是 PNG Base64 的开头
+      return `data:image/jpeg;base64,${imageData}`;
+    }
+    
+    // 如果是 Base64 数据，直接返回
+    if (imageData.startsWith('data:image/')) {
+      return imageData;
+    }
+    
+    // 如果是 API 路径，添加服务器地址
+    if (imageData.startsWith('/api/')) {
+      return `http://localhost:8080${imageData}`;
+    }
+    
     // 如果是相对路径，添加服务器地址
     if (imageData.startsWith('/')) {
-      return `http://localhost:8081${imageData}`;
+      return `http://localhost:8080${imageData}`;
+    }
+    
+    // 假设是 Base64 编码的图片数据，添加前缀
+    if (imageData.length > 100 && !imageData.includes('/')) {
+      return `data:image/jpeg;base64,${imageData}`;
     }
     
     // 直接返回（可能是其他格式）
@@ -179,70 +405,100 @@ const DefectDetailView = () => {
         <section className="w-[40%] border-r border-slate-800 bg-black/40 flex flex-col">
           {/* 图片切换按钮 */}
           <div className="p-3 flex space-x-2">
-            <button
-              onClick={() => setActiveImage('original')}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                activeImage === 'original'
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
-                  : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
-              }`}
-            >
-              原始图
-            </button>
-            <button
-              onClick={() => setActiveImage('detection')}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                activeImage === 'detection'
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
-                  : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
-              }`}
-            >
-              检测图
-            </button>
-            <button
-              onClick={() => setActiveImage('thermal')}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                activeImage === 'thermal'
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
-                  : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
-              }`}
-            >
-              红外图
-            </button>
+            {defect.originalImage && (
+              <button
+                onClick={() => setActiveImage('original')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  activeImage === 'original'
+                    ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
+                    : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                原始图
+              </button>
+            )}
+            {defect.detectionImage && (
+              <button
+                onClick={() => setActiveImage('detection')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  activeImage === 'detection'
+                    ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
+                    : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                检测图
+              </button>
+            )}
+            {defect.thermalImage && (
+              <button
+                onClick={() => setActiveImage('thermal')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  activeImage === 'thermal'
+                    ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50'
+                    : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                红外图
+              </button>
+            )}
           </div>
 
           {/* 图片显示区 */}
-          <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
+          <div className="flex-1 p-4 flex items-center justify-center overflow-hidden bg-black/60">
             {activeImage === 'original' && defect.originalImage ? (
-              <img
-                src={getImageSrc(defect.originalImage)}
-                alt="原始图片"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                onError={(e) => {
-                  console.error('图片加载失败:', defect.originalImage?.substring(0, 100));
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  ref={imageRef}
+                  src={getImageSrc(defect.originalImage)}
+                  alt="原始图片"
+                  className="hidden"
+                  onLoad={() => drawDetectionBoxes(defect.originalImage, '[]')}
+                  onError={(e) => {
+                    console.error('图片加载失败:', defect.originalImage?.substring(0, 100));
+                  }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="max-w-full max-h-full rounded-lg shadow-2xl"
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
+                />
+              </div>
             ) : activeImage === 'detection' && defect.detectionImage ? (
-              <img
-                src={getImageSrc(defect.detectionImage)}
-                alt="检测结果图"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                onError={(e) => {
-                  console.error('图片加载失败:', defect.detectionImage?.substring(0, 100));
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  ref={imageRef}
+                  src={getImageSrc(defect.detectionImage)}
+                  alt="检测结果图"
+                  className="hidden"
+                  onLoad={() => drawDetectionBoxes(defect.detectionImage, defect.aiAnalysis)}
+                  onError={(e) => {
+                    console.error('图片加载失败:', defect.detectionImage?.substring(0, 100));
+                  }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="max-w-full max-h-full rounded-lg shadow-2xl"
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
+                />
+              </div>
             ) : activeImage === 'thermal' && defect.thermalImage ? (
-              <img
-                src={getImageSrc(defect.thermalImage)}
-                alt="红外热力图"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                onError={(e) => {
-                  console.error('图片加载失败:', defect.thermalImage?.substring(0, 100));
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <div className="relative w-full h-full flex items-center justify-center">
+                <img
+                  ref={imageRef}
+                  src={getImageSrc(defect.thermalImage)}
+                  alt="红外热力图"
+                  className="hidden"
+                  onLoad={() => drawDetectionBoxes(defect.thermalImage, defect.solution)}
+                  onError={(e) => {
+                    console.error('图片加载失败:', defect.thermalImage?.substring(0, 100));
+                  }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="max-w-full max-h-full rounded-lg shadow-2xl"
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }}
+                />
+              </div>
             ) : (
               <div className="text-center text-slate-500">
                 <Icon icon="heroicons:photo" className="text-6xl mb-4" />
@@ -282,7 +538,7 @@ const DefectDetailView = () => {
 
         {/* 中间：AI 分析 (30%) */}
         <section className="w-[30%] border-r border-slate-800 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-slate-800">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                 <Icon icon="simple-icons:openai" className="text-white text-sm" />
@@ -292,12 +548,31 @@ const DefectDetailView = () => {
                 <p className="text-[10px] text-slate-500">多模态数据融合</p>
               </div>
             </div>
+            {!defect.aiTextAnalysis && (
+              <button
+                onClick={handleAIAnalysis}
+                disabled={analyzing}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1"
+              >
+                {analyzing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>
+                    分析中...
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="heroicons:sparkles" className="text-sm" />
+                    分析
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {defect.aiAnalysis ? (
+            {defect.aiTextAnalysis ? (
               <>
-                {defect.aiAnalysis.split('\n\n').map((section, idx) => {
+                {defect.aiTextAnalysis.split('\n\n').map((section, idx) => {
                   const isTitleLine = /^\d+\./.test(section.trim());
                   
                   if (isTitleLine) {
@@ -365,7 +640,7 @@ const DefectDetailView = () => {
 
         {/* 右侧：解决方案 (30%) */}
         <section className="w-[30%] flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-slate-800">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
                 <Icon icon="mdi:tools" className="text-white text-sm" />
@@ -375,12 +650,22 @@ const DefectDetailView = () => {
                 <p className="text-[10px] text-slate-500">维修和处理方案</p>
               </div>
             </div>
+            {!defect.aiTextSolution && defect.aiTextAnalysis && (
+              <button
+                onClick={handleAIAnalysis}
+                disabled={analyzing}
+                className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1"
+              >
+                <Icon icon="heroicons:sparkles" className="text-sm" />
+                生成
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {defect.solution ? (
+            {defect.aiTextSolution ? (
               <>
-                {defect.solution.split('\n\n').map((section, idx) => {
+                {defect.aiTextSolution.split('\n\n').map((section, idx) => {
                   const isTitleLine = /^\d+\./.test(section.trim());
                   
                   if (isTitleLine) {

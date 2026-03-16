@@ -12,12 +12,30 @@ const Dashboard = () => {
     battery: 78
   });
 
+  const [schedules, setSchedules] = useState([
+    { time: '14:00', title: 'Zone-A 二次巡检', location: '北区 A1-A12', status: 'running', uav: 'UAV-07' },
+    { time: '15:30', title: 'Zone-B 设备检测', location: '南区 B3-B8', status: 'pending', uav: 'UAV-09' },
+    { time: '17:00', title: 'Zone-C 路线规划', location: '东区 C1-C6', status: 'pending', uav: 'UAV-04' },
+    { time: '18:30', title: 'Zone-D 夜间巡检', location: '西区 D1-D10', status: 'pending', uav: 'UAV-02' },
+    { time: '19:45', title: 'Zone-A 补充检测', location: '北区 A7-A12', status: 'pending', uav: 'UAV-11' },
+    { time: '21:00', title: 'Zone-B 热成像扫描', location: '南区 B1-B8', status: 'pending', uav: 'UAV-08' },
+    { time: '22:30', title: 'Zone-C 精细检查', location: '东区 C3-C6', status: 'pending', uav: 'UAV-03' },
+    { time: '23:59', title: 'Zone-D 日终总结', location: '西区 D1-D10', status: 'pending', uav: 'UAV-06' },
+  ]);
+
   const [activities, setActivities] = useState([
     { icon: 'alert-triangle', title: '检测到绝缘子破损', meta: 'UAV-12 · Zone-A · 塔架 A-07', time: '14:28', alert: true },
-    { icon: 'check-circle', title: '完成塔架巡检', meta: 'UAV-07 · Zone-A · 塔架 A-12', time: '14:15', alert: false },
-    { icon: 'battery', title: 'UAV-05 电量低于20%', meta: '返回充电站中...', time: '14:10', alert: false },
-    { icon: 'play', title: '启动 Zone-B 巡检', meta: 'UAV-09 · 准备起飞', time: '14:05', alert: false },
-    { icon: 'check-circle', title: '完成航点拍摄', meta: 'UAV-03 · Zone-A · 航点 15', time: '14:00', alert: false },
+    { icon: 'check-circle', title: '完成塔架巡检', meta: 'UAV-07 · Zone-A · 塔架 A-12', time: '14:25', alert: false },
+    { icon: 'battery', title: 'UAV-05 电量低于20%', meta: '返回充电站中...', time: '14:22', alert: false },
+    { icon: 'play', title: '启动 Zone-B 巡检', meta: 'UAV-09 · 准备起飞', time: '14:20', alert: false },
+    { icon: 'check-circle', title: '完成航点拍摄', meta: 'UAV-03 · Zone-A · 航点 15', time: '14:18', alert: false },
+    { icon: 'camera', title: '采集高清图像', meta: 'UAV-08 · Zone-C · 设备 C-04', time: '14:15', alert: false },
+    { icon: 'zap', title: '检测到异常温度', meta: 'UAV-11 · Zone-B · 变压器 B-02', time: '14:12', alert: true },
+    { icon: 'check-circle', title: '完成区域扫描', meta: 'UAV-04 · Zone-A · 完成度 100%', time: '14:10', alert: false },
+    { icon: 'wifi', title: '信号强度下降', meta: 'UAV-06 · 距离基站 2.5km', time: '14:08', alert: false },
+    { icon: 'play', title: '启动自动巡检', meta: 'UAV-02 · Zone-D · 预计耗时 45min', time: '14:05', alert: false },
+    { icon: 'check-circle', title: '完成数据上传', meta: '本次巡检 · 共 2847 张图像', time: '14:02', alert: false },
+    { icon: 'alert-circle', title: '检测到异物', meta: 'UAV-10 · Zone-A · 塔架 A-15', time: '13:58', alert: true },
   ]);
 
   const quickAccessItems = [
@@ -47,7 +65,33 @@ const Dashboard = () => {
       }));
     }, 5000);
 
-    return () => clearInterval(interval);
+    // 自动滚动日志
+    const scrollInterval = setInterval(() => {
+      const activityList = document.querySelector('.activity-list');
+      if (activityList) {
+        activityList.scrollTop += 1;
+        if (activityList.scrollTop >= activityList.scrollHeight - activityList.clientHeight) {
+          activityList.scrollTop = 0;
+        }
+      }
+    }, 50);
+
+    // 自动滚动巡检计划
+    const scheduleScrollInterval = setInterval(() => {
+      const scheduleList = document.querySelector('.schedule-list');
+      if (scheduleList) {
+        scheduleList.scrollTop += 1;
+        if (scheduleList.scrollTop >= scheduleList.scrollHeight - scheduleList.clientHeight) {
+          scheduleList.scrollTop = 0;
+        }
+      }
+    }, 50);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(scrollInterval);
+      clearInterval(scheduleScrollInterval);
+    };
   }, []);
 
   const handleAccessClick = (path: string) => {
@@ -116,36 +160,20 @@ const Dashboard = () => {
             <h3 className="panel-title">巡检计划</h3>
           </div>
           <div className="schedule-list">
-            <div className="schedule-item active">
-              <div className="schedule-info">
-                <div className="schedule-time">14:00</div>
-                <div className="schedule-details">
-                  <div className="schedule-title">Zone-A 二次巡检</div>
-                  <div className="schedule-location">北区 A1-A12</div>
+            {schedules.map((schedule, idx) => (
+              <div key={idx} className={`schedule-item ${schedule.status === 'running' ? 'active' : ''}`}>
+                <div className="schedule-info">
+                  <div className="schedule-time">{schedule.time}</div>
+                  <div className="schedule-details">
+                    <div className="schedule-title">{schedule.title}</div>
+                    <div className="schedule-location">{schedule.location}</div>
+                  </div>
+                </div>
+                <div className={`schedule-status ${schedule.status}`}>
+                  {schedule.status === 'running' ? '进行中' : '待执行'}
                 </div>
               </div>
-              <div className="schedule-status running">进行中</div>
-            </div>
-            <div className="schedule-item">
-              <div className="schedule-info">
-                <div className="schedule-time">15:30</div>
-                <div className="schedule-details">
-                  <div className="schedule-title">Zone-B 设备检测</div>
-                  <div className="schedule-location">南区 B3-B8</div>
-                </div>
-              </div>
-              <div className="schedule-status pending">待执行</div>
-            </div>
-            <div className="schedule-item">
-              <div className="schedule-info">
-                <div className="schedule-time">17:00</div>
-                <div className="schedule-details">
-                  <div className="schedule-title">Zone-C 路线规划</div>
-                  <div className="schedule-location">东区 C1-C6</div>
-                </div>
-              </div>
-              <div className="schedule-status pending">待执行</div>
-            </div>
+            ))}
           </div>
         </div>
 

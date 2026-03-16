@@ -13,16 +13,39 @@ interface FlightPathModalProps {
 }
 
 const AMAP_KEY = 'a0c628a7cbe0de2e9ec5a3f548854b58';
-const AMAP_URL = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor`;
 
-const DEFAULT_PATH: LngLat[] = [
-  [116.362209, 39.887487],
-  [116.422897, 39.878002],
-  [116.392105, 39.90651],
-  [116.372105, 39.91751],
-  [116.362105, 39.93751],
-  [116.362209, 39.887487],
-];
+// 武汉附近坐标
+const WUHAN_CENTER: LngLat = [114.305, 30.593];
+
+// 生成随机巡检区域（矩形）
+const generateRandomInspectionArea = (center: LngLat, index: number): LngLat[] => {
+  const seed = index * 12345;
+  const random = (offset: number) => {
+    const x = Math.sin(seed + offset) * 10000;
+    return x - Math.floor(x);
+  };
+  
+  const offsetLng = (random(1) - 0.5) * 0.08;
+  const offsetLat = (random(2) - 0.5) * 0.08;
+  
+  const width = 0.02 + random(3) * 0.03;
+  const height = 0.02 + random(4) * 0.03;
+  
+  const centerLng = center[0] + offsetLng;
+  const centerLat = center[1] + offsetLat;
+  
+  const path: LngLat[] = [
+    [centerLng - width / 2, centerLat - height / 2],
+    [centerLng + width / 2, centerLat - height / 2],
+    [centerLng + width / 2, centerLat + height / 2],
+    [centerLng - width / 2, centerLat + height / 2],
+    [centerLng - width / 2, centerLat - height / 2],
+  ];
+  
+  return path;
+};
+
+const DEFAULT_PATH: LngLat[] = generateRandomInspectionArea(WUHAN_CENTER, 0);
 
 const DEFAULT_GEOJSON = JSON.stringify(
   {
@@ -53,10 +76,11 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
   const currentPathIndexRef = useRef(0);
   const isPickingStartRef = useRef(false);
   const isPickingEndRef = useRef(false);
+  const isDrawingModeRef = useRef(false);
 
   const [path, setPath] = useState<LngLat[]>(DEFAULT_PATH);
   const [geojsonText, setGeojsonText] = useState(DEFAULT_GEOJSON);
-  const [startPoint, setStartPoint] = useState<LngLat>([116.352209, 39.867487]);
+  const [startPoint, setStartPoint] = useState<LngLat>(WUHAN_CENTER);
   const [endPoint, setEndPoint] = useState<LngLat | null>(null);
   const [spacing, setSpacing] = useState(350);
   const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal');
@@ -72,11 +96,14 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
     path: [],
     waypoints: [],
   });
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState<LngLat[]>([]);
 
   useEffect(() => {
     isPickingStartRef.current = isPickingStart;
     isPickingEndRef.current = isPickingEnd;
-  }, [isPickingStart, isPickingEnd]);
+    isDrawingModeRef.current = isDrawingMode;
+  }, [isPickingStart, isPickingEnd, isDrawingMode]);
 
   const polygonPath =
     path.length > 1 &&
@@ -148,11 +175,10 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
     const loadAMap = () => {
       return new Promise<void>((resolve, reject) => {
         if (window.AMap) {
-          resolve();
-          return;
+          delete (window as any).AMap;
         }
         const script = document.createElement('script');
-        script.src = AMAP_URL;
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor&_t=${Math.random()}`;
         script.async = true;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('AMap load failed'));
@@ -164,8 +190,8 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
       .then(() => {
         const AMap = window.AMap;
         const map = new AMap.Map(containerRef.current!, {
-          center: [116.395577, 39.892257],
-          zoom: 14,
+          center: WUHAN_CENTER,
+          zoom: 13,
           viewMode: '3D',
           pitch: 55,
           rotation: -15,
@@ -180,9 +206,16 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
           fillColor: '#3b82f6',
           fillOpacity: 0.3,
           zIndex: 50,
+          draggable: true,
         });
         polygonRef.current = polygon;
         map.add(polygon);
+
+        // 监听多边形拖动事件
+        polygon.on('change', () => {
+          const newPath = polygon.getPath();
+          setPath(newPath);
+        });
 
         const initialResult = generateFlightPath(polygonPath, spacing, startPoint, direction, endPoint);
         setFlightData(initialResult);
@@ -205,6 +238,26 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
         map.on('click', (e: any) => {
           const lnglat = e.lnglat;
           const coords: LngLat = [lnglat.getLng(), lnglat.getLat()];
+          
+          // 绘制模式
+          if (isDrawingModeRef.current) {
+            setDrawingPoints((prevPoints) => {
+              const newPoints = [...prevPoints, coords];
+              
+              // 显示绘制点
+              const marker = new window.AMap.Marker({
+                position: coords,
+                offset: new window.AMap.Pixel(-10, -10),
+                content: `<div class="rounded-full border-2 border-emerald-500 bg-white px-2 py-0.5 text-emerald-600 font-bold text-xs">${newPoints.length}</div>`,
+                zIndex: 52,
+              });
+              marker.setMap(map);
+              
+              return newPoints;
+            });
+            return;
+          }
+          
           if (isPickingStartRef.current) {
             setStartPoint(coords);
             if (startMarkerRef.current) {
@@ -356,6 +409,28 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
     }, BASE_INTERVAL / speed);
   };
 
+  const startDrawing = () => {
+    setIsDrawingMode(true);
+    setDrawingPoints([]);
+  };
+
+  const finishDrawing = () => {
+    if (drawingPoints.length < 3) {
+      alert('至少需要3个点来形成区域');
+      return;
+    }
+    const closedPath = [...drawingPoints, drawingPoints[0]];
+    setPath(closedPath);
+    setIsDrawingMode(false);
+    setDrawingPoints([]);
+    mapRef.current?.setFitView();
+  };
+
+  const cancelDrawing = () => {
+    setIsDrawingMode(false);
+    setDrawingPoints([]);
+  };
+
   const saveFlightPath = async () => {
     const withAltitude = (coord: LngLat) => [coord[0], coord[1], flightHeight] as [number, number, number];
     const geojson = {
@@ -467,14 +542,40 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
                 </div>
                 <p className="text-xs text-slate-400">在地图上直接绘制或调整扫描区域</p>
                 <button
-                  onClick={() => {
-                    // 可以在这里添加绘制模式的切换
-                    alert('在地图上点击和拖动来绘制扫描区域');
-                  }}
-                  className="w-full rounded-lg border border-cyan-600 bg-cyan-600/20 py-2.5 text-sm font-medium text-cyan-400 transition hover:bg-cyan-600/30"
+                  onClick={startDrawing}
+                  disabled={isDrawingMode}
+                  className={`w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition ${
+                    isDrawingMode
+                      ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/50'
+                      : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500'
+                  }`}
                 >
-                  在地图上绘制区域
+                  <Icon icon="heroicons:pencil-square" />
+                  自定义绘制区域
                 </button>
+                
+                {isDrawingMode && (
+                  <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 space-y-2">
+                    <p className="text-xs text-emerald-400 font-semibold">绘制模式已启用</p>
+                    <p className="text-xs text-slate-400">在地图上点击添加区域顶点（至少3个点）</p>
+                    <p className="text-xs text-emerald-400">已添加 {drawingPoints.length} 个点</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={finishDrawing}
+                        disabled={drawingPoints.length < 3}
+                        className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold py-1.5 transition"
+                      >
+                        完成绘制
+                      </button>
+                      <button
+                        onClick={cancelDrawing}
+                        className="flex-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold py-1.5 transition"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 路线设置 */}

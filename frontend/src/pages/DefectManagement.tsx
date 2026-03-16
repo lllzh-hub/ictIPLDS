@@ -101,6 +101,25 @@ const DefectManagement = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!confirm('确定要删除所有缺陷记录吗？此操作不可撤销！')) return;
+    if (!confirm('再次确认：删除所有 ' + defects.length + ' 条缺陷记录？')) return;
+    
+    setLoading(true);
+    try {
+      for (const defect of defects) {
+        if (defect.id) {
+          await defectApi.deleteDefect(defect.id);
+        }
+      }
+      loadDefects();
+    } catch (error) {
+      console.error('删除失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleViewDetail = (id: number) => {
     navigate(`/defect/${id}`);
   };
@@ -381,6 +400,16 @@ const DefectManagement = () => {
                   <Icon icon="heroicons:plus" />
                   <span>新增缺陷</span>
                 </button>
+                {defects.length > 0 && (
+                  <button
+                    onClick={handleDeleteAll}
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-lg shadow-red-500/20"
+                  >
+                    <Icon icon="heroicons:trash" />
+                    <span>删除全部</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -410,8 +439,21 @@ const DefectManagement = () => {
                     if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
                       return imageData;
                     }
+                    // 如果是 Base64 数据（JPEG 开头），添加前缀
+                    if (imageData.startsWith('/9j/') || imageData.startsWith('iVBORw0KGgo')) {
+                      return `data:image/jpeg;base64,${imageData}`;
+                    }
+                    if (imageData.startsWith('data:image/')) {
+                      return imageData;
+                    }
+                    if (imageData.startsWith('/api/')) {
+                      return `http://localhost:8080${imageData}`;
+                    }
                     if (imageData.startsWith('/')) {
                       return `http://localhost:8080${imageData}`;
+                    }
+                    if (imageData.length > 100 && !imageData.includes('/')) {
+                      return `data:image/jpeg;base64,${imageData}`;
                     }
                     return imageData;
                   };
