@@ -8,6 +8,11 @@ interface Message {
   content: string;
 }
 
+interface Position {
+  x: number;
+  y: number;
+}
+
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -17,13 +22,31 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const messageIdCounter = useRef(2);
+  const positionRef = useRef<Position>({ x: 0, y: 0 });
+  const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
 
   // 调试：确认代码已更新
   useEffect(() => {
     console.log('AIAssistant 组件已更新 - 使用唯一ID作为key');
   }, []);
+
+  // 初始化位置（右下角）
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      // 初始位置设为右下角
+      positionRef.current = {
+        x: window.innerWidth - 384 - 24,
+        y: window.innerHeight - 600 - 24
+      };
+      
+      containerRef.current.style.left = `${positionRef.current.x}px`;
+      containerRef.current.style.top = `${positionRef.current.y}px`;
+    }
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,6 +55,57 @@ const AIAssistant = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // 处理鼠标按下事件
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('textarea')) {
+      return;
+    }
+    
+    e.preventDefault();
+    setIsDragging(true);
+    dragOffsetRef.current = {
+      x: e.clientX - positionRef.current.x,
+      y: e.clientY - positionRef.current.y
+    };
+  };
+
+  // 处理鼠标移动事件
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !containerRef.current) return;
+
+      const newX = e.clientX - dragOffsetRef.current.x;
+      const newY = e.clientY - dragOffsetRef.current.y;
+
+      // 限制在视口范围内
+      const maxX = window.innerWidth - 384;
+      const maxY = window.innerHeight - 600;
+
+      positionRef.current = {
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      };
+
+      // 使用 left/top 定位
+      containerRef.current.style.left = `${positionRef.current.x}px`;
+      containerRef.current.style.top = `${positionRef.current.y}px`;
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -113,13 +187,25 @@ const AIAssistant = () => {
 
   return (
     <div 
-      className={`fixed bottom-6 right-6 bg-slate-900 border border-violet-500/30 rounded-2xl shadow-2xl z-50 transition-all ${
+      ref={containerRef}
+      className={`fixed bg-slate-900 border border-violet-500/30 rounded-2xl shadow-2xl z-50 ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      } ${
         isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
       }`}
+      style={{
+        left: '0',
+        top: '0',
+        userSelect: isDragging ? 'none' : 'auto'
+      }}
     >
       {/* 头部 */}
-      <div className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-t-2xl px-4 flex items-center justify-between cursor-pointer" onClick={() => isMinimized && setIsMinimized(false)}>
-        <div className="flex items-center space-x-3">
+      <div 
+        className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-t-2xl px-4 flex items-center justify-between cursor-grab active:cursor-grabbing"
+        onMouseDown={handleMouseDown}
+        onClick={() => isMinimized && setIsMinimized(false)}
+      >
+        <div className="flex items-center space-x-3 pointer-events-none">
           <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
             <Icon icon="mdi:robot-excited" className="text-white text-xl" />
           </div>
@@ -130,7 +216,7 @@ const AIAssistant = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 pointer-events-auto">
           <div className="relative">
             <button
               onClick={(e) => {
@@ -266,4 +352,5 @@ const AIAssistant = () => {
 };
 
 export default AIAssistant;
+
 

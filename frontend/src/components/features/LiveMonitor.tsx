@@ -13,41 +13,47 @@ interface UAVInfo {
   altitude: number;
 }
 
+interface CameraConfig {
+  uavId: string;
+  cameraUrl: string;
+  type: 'rtsp' | 'ws' | 'http' | 'file';
+}
+
 const LiveMonitor = () => {
   const [uavList, setUavList] = useState<UAVInfo[]>([]);
   const [selectedUAVId, setSelectedUAVId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cameraConfigs, setCameraConfigs] = useState<Map<string, CameraConfig>>(new Map());
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // 从数据库获取无人机列表
   useEffect(() => {
     fetchUAVList();
+    fetchCameraConfigs();
   }, []);
 
   const fetchUAVList = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:8080/api/drones');
+      const response = await fetch('/api/drones');
       if (!response.ok) throw new Error('获取无人机列表失败');
       const data = await response.json();
       
-      // 转换数据格式，确保字段名称一致
       const formattedData = data.map((drone: any) => ({
         id: drone.id,
         uavId: drone.droneId,
         name: drone.name,
         status: drone.status?.toLowerCase() === 'in_flight' ? 'working' : 'standby',
         battery: Math.round(drone.batteryLevel) || 0,
-        speed: 0, // 后端暂无速度数据，默认为0
+        speed: 0,
         latitude: drone.latitude || 0,
         longitude: drone.longitude || 0,
-        altitude: 0 // 后端暂无高度数据，默认为0
+        altitude: 0
       }));
       
       setUavList(formattedData);
-      // 默认选择第一个无人机
       if (formattedData.length > 0) {
         setSelectedUAVId(formattedData[0].uavId);
       }
@@ -59,40 +65,87 @@ const LiveMonitor = () => {
     }
   };
 
-  // 获取视频源
-  const getVideoSource = (uavId: string): string | null => {
-    // 预置视频源映射
-    const videoSources: { [key: string]: string } = {
-      'UAV-01': 'http://localhost:8080/api/video/stream/0f84fa38c795c5dc0f612ca789e306eb_raw.mp4',
-      'UAV-02': 'http://localhost:8080/api/video/stream/sample_video.mp4',
-      'UAV-03': 'http://localhost:8080/api/video/stream/sample_video.mp4',
-      'UAV-05': 'http://localhost:8080/api/video/stream/sample_video.mp4',
-      'UAV-07': 'http://localhost:8080/api/video/stream/sample_video.mp4',
-      'UAV-12': 'http://localhost:8080/api/video/stream/sample_video.mp4',
-    };
-    
-    return videoSources[uavId] || null;
+  // 获取摄像头配置
+  const fetchCameraConfigs = async () => {
+    try {
+      const response = await fetch('/api/camera-config', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const configMap = new Map<string, CameraConfig>();
+        data.forEach((config: CameraConfig) => {
+          configMap.set(config.uavId, config);
+        });
+        setCameraConfigs(configMap);
+      } else {
+        console.warn('摄像头配置API返回非200状态码，使用默认视频');
+      }
+    } catch (err) {
+      console.warn('获取摄像头配置失败，将使用默认视频文件:', err);
+      // 不抛出错误，继续使用默认视频
+    }
+  };
+
+  // 获取视频源 - 通用接口
+  const getVideoSource = (uavId: string): { url: string | null; type: 'live' | 'file' | 'none' } => {
+    // 首先检查是否有实时摄像头配置
+    const cameraConfig = cameraConfigs.get(uavId);
+    if (cameraConfig) {
+      return { url: cameraConfig.cameraUrl, type: 'live' };
+    }
+
+    // 如果没有实时摄像头配置，使用默认视频文件
+    const uavNumber = uavId.split('-')[1];
+    if (uavNumber) {
+      const paddedNumber = uavNumber.padStart(4, '0');
+      // 从后端获取视频文件，使用相对路径
+      const defaultVideoPath = `/docs/${paddedNumber}.mp4`;
+      return { url: defaultVideoPath, type: 'file' };
+    }
+
+    return { url: null, type: 'none' };
+  };
+
+  // 检查是否为实时摄像头流
+  const isLiveCamera = (url: string | null): boolean => {
+    return url?.startsWith('rtsp://') || url?.startsWith('ws://') || url?.startsWith('wss://') || false;
   };
 
   // 当选择的无人机改变时，更新视频源
   useEffect(() => {
     if (videoRef.current && selectedUAVId) {
-      const videoSource = getVideoSource(selectedUAVId);
-      if (videoSource) {
-        videoRef.current.src = videoSource;
-        videoRef.current.load();
-        videoRef.current.play().catch(err => {
-          console.log('视频播放失败:', err);
-        });
+      const { url, type } = getVideoSource(selectedUAVId);
+      
+      if (url) {
+        if (type === 'live' && isLiveCamera(url)) {
+          // 实时摄像头流处理
+          console.log('连接实时摄像头流:', url);
+          videoRef.current.src = '';
+          videoRef.current.pause();
+        } else {
+          // 视频文件处理
+          videoRef.current.src = url;
+          videoRef.current.load();
+          videoRef.current.play().catch(err => {
+            console.log('视频播放失败:', err);
+          });
+        }
       } else {
         videoRef.current.pause();
         videoRef.current.src = '';
       }
     }
-  }, [selectedUAVId]);
+  }, [selectedUAVId, cameraConfigs]);
 
   const currentUAV = uavList.find(u => u.uavId === selectedUAVId);
-  const videoSource = selectedUAVId ? getVideoSource(selectedUAVId) : null;
+  const videoSourceInfo = selectedUAVId ? getVideoSource(selectedUAVId) : { url: null, type: 'none' as const };
 
   return (
     <div className="w-full h-full bg-slate-900/50 backdrop-blur-sm border border-violet-500/30 rounded-2xl overflow-hidden flex flex-col">
@@ -141,7 +194,7 @@ const LiveMonitor = () => {
 
       {/* 视频显示区域 */}
       <div className="flex-1 relative bg-slate-950 overflow-hidden">
-        {videoSource ? (
+        {videoSourceInfo.url ? (
           <>
             {/* 视频播放器 */}
             <video
@@ -152,7 +205,7 @@ const LiveMonitor = () => {
               playsInline
               crossOrigin="anonymous"
             >
-              <source src={videoSource} type="video/mp4" />
+              <source src={videoSourceInfo.url} type="video/mp4" />
               您的浏览器不支持视频播放
             </video>
 
@@ -160,7 +213,9 @@ const LiveMonitor = () => {
             <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-white text-sm font-bold">{currentUAV?.name} LIVE</span>
+                <span className="text-white text-sm font-bold">
+                  {currentUAV?.name} {videoSourceInfo.type === 'live' ? 'LIVE' : 'VIDEO'}
+                </span>
               </div>
             </div>
 
@@ -195,17 +250,15 @@ const LiveMonitor = () => {
             <p className="text-lg font-medium">暂无视频源</p>
             <p className="text-sm mt-2">
               {currentUAV?.uavId === 'UAV-02' 
-                ? '预留实时摄像头视频输入接口' 
-                : '该无人机暂未配置视频源'}
+                ? '实时摄像头输入接口（预留）' 
+                : `该无人机暂未配置视频源 (${currentUAV?.uavId})`}
             </p>
-            {currentUAV?.uavId === 'UAV-02' && (
-              <div className="mt-4 px-4 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
-                <p className="text-violet-400 text-xs text-center">
-                  <Icon icon="mdi:information" className="inline mr-1" />
-                  此接口预留用于接入实时摄像头视频流
-                </p>
-              </div>
-            )}
+            <div className="mt-4 px-4 py-2 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+              <p className="text-violet-400 text-xs text-center">
+                <Icon icon="mdi:information" className="inline mr-1" />
+                可通过 API 配置摄像头：POST /api/camera-config
+              </p>
+            </div>
           </div>
         )}
       </div>

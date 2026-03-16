@@ -9,6 +9,18 @@ export default defineConfig({
     middlewareMode: false,
     fs: {
       allow: ['..']
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
+      '/docs': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
     }
   },
   resolve: {
@@ -17,3 +29,4 @@ export default defineConfig({
     }
   }
 })
+
