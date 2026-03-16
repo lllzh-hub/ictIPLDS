@@ -17,13 +17,69 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [position, setPosition] = useState({ x: window.innerWidth - 400, y: window.innerHeight - 650 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdCounter = useRef(2);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
 
   // 调试：确认代码已更新
   useEffect(() => {
     console.log('AIAssistant 组件已更新 - 使用唯一ID作为key');
   }, []);
+
+  // 拖动功能
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isOpen && e.button === 0) { // 只响应左键
+      setIsDragging(true);
+      dragStartPos.current = {
+        x: e.clientX,
+        y: e.clientY,
+      };
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && isOpen) {
+        const deltaX = e.clientX - dragStartPos.current.x;
+        const deltaY = e.clientY - dragStartPos.current.y;
+        
+        const newX = position.x + deltaX;
+        const newY = position.y + deltaY;
+        
+        // 限制在窗口范围内
+        const maxX = window.innerWidth - (isMinimized ? 320 : 384);
+        const maxY = window.innerHeight - (isMinimized ? 64 : 600);
+        
+        setPosition({
+          x: Math.max(0, Math.min(newX, maxX)),
+          y: Math.max(0, Math.min(newY, maxY)),
+        });
+        
+        dragStartPos.current = {
+          x: e.clientX,
+          y: e.clientY,
+        };
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, position, isOpen, isMinimized]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,28 +156,38 @@ const AIAssistant = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-50 group animate-bounce"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-50 group"
         title="AI智能助手"
-        style={{ animationDuration: '2s' }}
       >
-        <Icon icon="mdi:robot-excited" className="text-3xl group-hover:scale-110 transition-transform" />
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse border-2 border-white"></div>
-        <div className="absolute inset-0 rounded-full bg-violet-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+        <Icon icon="mdi:robot-excited" className="text-4xl group-hover:scale-125 transition-transform duration-300" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-400 to-purple-400 opacity-0 group-hover:opacity-30 transition-opacity duration-300 blur-lg"></div>
       </button>
     );
   }
 
   return (
     <div 
-      className={`fixed bottom-6 right-6 bg-slate-900 border border-violet-500/30 rounded-2xl shadow-2xl z-50 transition-all ${
+      ref={containerRef}
+      className={`fixed bg-slate-900 border border-violet-500/30 rounded-2xl shadow-2xl z-50 ${
         isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
-      }`}
+      } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        bottom: 'auto',
+        right: 'auto',
+        transition: isDragging ? 'none' : 'all 0.3s ease-out',
+      }}
     >
       {/* 头部 */}
-      <div className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-t-2xl px-4 flex items-center justify-between cursor-pointer" onClick={() => isMinimized && setIsMinimized(false)}>
+      <div 
+        className="h-16 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-t-2xl px-4 flex items-center justify-between cursor-grab active:cursor-grabbing select-none hover:shadow-lg transition-shadow"
+        onMouseDown={handleMouseDown}
+        onClick={() => isMinimized && setIsMinimized(false)}
+      >
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-            <Icon icon="mdi:robot-excited" className="text-white text-xl" />
+          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <Icon icon="mdi:robot-excited" className="text-white text-2xl" />
           </div>
           <div>
             <h3 className="text-white font-bold text-sm">AI智能助手</h3>

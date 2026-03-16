@@ -5,7 +5,6 @@ import Dashboard from './pages/Dashboard';
 import DefectManagement from './pages/DefectManagement';
 import DefectDetailView from './pages/DefectDetailView';
 import UAVManagement from './pages/UAVManagement';
-import FlightPathPlanning from './pages/FlightPathPlanning';
 
 function App() {
   return (
@@ -21,7 +20,6 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/defect-management" element={<DefectManagement />} />
               <Route path="/uav-management" element={<UAVManagement />} />
-              <Route path="/flight-path" element={<FlightPathPlanning />} />
             </Routes>
           </Layout>
         } />

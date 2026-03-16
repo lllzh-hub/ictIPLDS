@@ -14,7 +14,6 @@ const Layout = ({ children }: LayoutProps) => {
     { path: '/', label: '态势感知驾驶舱', icon: 'material-symbols:dashboard-outline' },
     { path: '/defect-management', label: '缺陷管理', icon: 'material-symbols:bug-report-outline' },
     { path: '/uav-management', label: '无人机管理', icon: 'mdi:quadcopter' },
-    { path: '/flight-path', label: '航线规划', icon: 'material-symbols:route-outline' },
   ];
 
   const isActive = (path: string) => {

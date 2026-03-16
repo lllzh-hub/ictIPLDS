@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/common/Icon';
+import FlightPathModal from '../components/features/FlightPathModal';
 
 interface UAV {
   id: string;
@@ -85,6 +86,7 @@ const UAVManagement = () => {
 
   const [selectedUAV, setSelectedUAV] = useState<UAV | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showFlightPathViewer, setShowFlightPathViewer] = useState(false);
 
   // 更新无人机状态（模拟实时更新）
   useEffect(() => {
@@ -295,12 +297,13 @@ const UAVManagement = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log('操作无人机:', uav.id);
+                            setSelectedUAV(uav);
+                            setShowFlightPathViewer(true);
                           }}
                           className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1.5 font-semibold hover:bg-cyan-500/10 px-3 py-1.5 rounded-lg transition-all"
                         >
-                          <Icon icon="heroicons:eye" />
-                          查看详情
+                          <Icon icon="material-symbols:route-outline" />
+                          航线规划
                         </button>
                       </div>
                     </div>
@@ -424,6 +427,14 @@ const UAVManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* 航线规划模态框 */}
+      {showFlightPathViewer && selectedUAV && (
+        <FlightPathModal
+          droneId={selectedUAV.id}
+          onClose={() => setShowFlightPathViewer(false)}
+        />
+      )}
     </div>
   );
 };
