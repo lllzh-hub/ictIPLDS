@@ -1,6 +1,7 @@
 package com.powerinspection.service;
 
 import java.util.List;
+import java.util.Map;
 
 public interface SftpService {
     /**
@@ -14,9 +15,14 @@ public interface SftpService {
     void disconnect();
 
     /**
-     * 列出远程目录中的文件
+     * 列出远程目录中的文件名
      */
     List<String> listFiles(String remotePath);
+
+    /**
+     * 列出远程目录中的文件，返回文件名 -> 修改时间(Unix秒) 的映射
+     */
+    Map<String, Long> listFilesWithMtime(String remotePath);
 
     /**
      * 下载文件
@@ -33,4 +39,3 @@ public interface SftpService {
      */
     boolean isConnected();
 }
-

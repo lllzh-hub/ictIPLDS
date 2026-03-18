@@ -62,6 +62,17 @@ public class Defect {
     @Column(name = "is_false_positive")
     private Boolean isFalsePositive;
 
+    /** 误检类型：如“无缺陷检测为有缺陷 / 缺陷识别类别出错 / 定位框偏移”等 */
+    @Column(name = "misdetection_type", columnDefinition = "TEXT")
+    private String misdetectionType;
+
+    /**
+     * 趋势发展数据（JSON字符串），示例：
+     * [{"tYears":0,"severity":"low"},{"tYears":1,"severity":"medium"},{"tYears":2,"severity":"high"}]
+     */
+    @Column(name = "severity_timeline", columnDefinition = "TEXT")
+    private String severityTimeline;
+
     @Column(name = "detected_at")
     private LocalDateTime detectedAt;
 

@@ -105,6 +105,12 @@ public class DefectServiceImpl implements DefectService {
             if (defect.getIsFalsePositive() != null) {
                 existingDefect.setIsFalsePositive(defect.getIsFalsePositive());
             }
+            if (defect.getMisdetectionType() != null) {
+                existingDefect.setMisdetectionType(defect.getMisdetectionType());
+            }
+            if (defect.getSeverityTimeline() != null) {
+                existingDefect.setSeverityTimeline(defect.getSeverityTimeline());
+            }
             existingDefect.setUpdatedAt(LocalDateTime.now());
             return defectRepository.save(existingDefect);
         }).orElseThrow(() -> new RuntimeException("缺陷不存在，ID: " + id));

@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 
 @Slf4j
@@ -83,7 +85,6 @@ public class SftpServiceImpl implements SftpService {
 
             Vector<ChannelSftp.LsEntry> entries = channelSftp.ls(remotePath);
             for (ChannelSftp.LsEntry entry : entries) {
-                // 包含文件夹和文件，但排除 . 和 ..
                 if (!entry.getFilename().startsWith(".")) {
                     fileList.add(entry.getFilename());
                 }
@@ -94,6 +95,29 @@ public class SftpServiceImpl implements SftpService {
             throw new RuntimeException("Failed to list SFTP files", e);
         }
         return fileList;
+    }
+
+    @Override
+    public Map<String, Long> listFilesWithMtime(String remotePath) {
+        Map<String, Long> result = new HashMap<>();
+        try {
+            if (!isConnected()) {
+                connect();
+            }
+            Vector<ChannelSftp.LsEntry> entries = channelSftp.ls(remotePath);
+            for (ChannelSftp.LsEntry entry : entries) {
+                if (!entry.getFilename().startsWith(".")) {
+                    // getMTime() 返回 Unix 秒级时间戳
+                    long mtime = entry.getAttrs().getMTime();
+                    result.put(entry.getFilename(), mtime);
+                }
+            }
+            log.info("Listed {} items with mtime from {}", result.size(), remotePath);
+        } catch (SftpException e) {
+            log.error("Failed to list files with mtime from {}: {}", remotePath, e.getMessage(), e);
+            throw new RuntimeException("Failed to list SFTP files with mtime", e);
+        }
+        return result;
     }
 
     @Override

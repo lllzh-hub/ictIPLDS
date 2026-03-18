@@ -15,6 +15,8 @@ export interface Defect {
   aiAnalysis?: string;
   solution?: string;
   isFalsePositive?: boolean;
+  misdetectionType?: string;
+  severityTimeline?: string;
 }
 
 export interface DetectionResult {

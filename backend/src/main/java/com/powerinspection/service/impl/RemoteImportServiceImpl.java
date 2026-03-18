@@ -93,7 +93,8 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                     sftpService.downloadFile(fullRemotePath + "/" + stream1JsonFile, localStream1JsonPath);
                     log.info("已下载Stream1文件");
 
-                    Map<String, Object> stream1Data = objectMapper.readValue(new File(localStream1JsonPath), Map.class);
+                    @SuppressWarnings({"rawtypes", "unchecked"})
+                    Map<String, Object> stream1Data = (Map) objectMapper.readValue(new File(localStream1JsonPath), Map.class);
                     log.info("Stream1 JSON数据: {}", stream1Data);
                     
                     // 不转换为 Base64，直接保存文件路径
@@ -127,9 +128,14 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                     defect.setStatus("pending");
                     defect.setConfidence(confidence);
 
-                    // 保存图片 URL 而不是 Base64
-                    defect.setOriginalImage(stream1ImageUrl);
-                    defect.setDetectionImage(stream1ImageUrl);
+                    // 图片下载后编码为 Base64 存入数据库，供 AI 多模态分析使用
+                    String stream1Base64 = encodeImageToBase64(localStream1ImagePath);
+                    String stream1DataUrl = stream1Base64 != null
+                        ? "data:image/jpeg;base64," + stream1Base64
+                        : stream1ImageUrl;
+
+                    defect.setOriginalImage(stream1DataUrl);   // Base64，供 AI 读取
+                    defect.setDetectionImage(stream1ImageUrl); // URL，供前端绘制检测框
                     defect.setImagePath(localStream1ImagePath);
                     
                     // 存储 stream1 的检测数据用于前端绘制框（只存储 detections 数组）
@@ -147,11 +153,16 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                             sftpService.downloadFile(fullRemotePath + "/" + stream2JsonFile, localStream2JsonPath);
                             log.info("已下载Stream2文件");
 
-                            Map<String, Object> stream2Data = objectMapper.readValue(new File(localStream2JsonPath), Map.class);
+                            @SuppressWarnings({"rawtypes", "unchecked"})
+                            Map<String, Object> stream2Data = (Map) objectMapper.readValue(new File(localStream2JsonPath), Map.class);
                             
-                            // 保存图片 URL 而不是 Base64
-                            String stream2ImageUrl = "/api/images/" + stream2ImageFile;
-                            defect.setThermalImage(stream2ImageUrl);
+                            // 图片下载后编码为 Base64 存入数据库，供 AI 多模态分析使用
+                            String stream2Base64 = encodeImageToBase64(localStream2ImagePath);
+                            String stream2DataUrl = stream2Base64 != null
+                                ? "data:image/jpeg;base64," + stream2Base64
+                                : "/api/images/" + stream2ImageFile;
+
+                            defect.setThermalImage(stream2DataUrl); // Base64，供 AI 读取
                             
                             // 存储 stream2 的检测数据用于前端绘制框（只存储 detections 数组）
                             @SuppressWarnings("unchecked")
@@ -221,9 +232,19 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                             solution = parts.length > 1 ? parts[1].trim() : "";
                         }
 
+                        // 检测误判标记并持久化
+                        boolean isFalsePositive = analysis.contains("[VERDICT:FALSE_POSITIVE]");
+                        // 清除 VERDICT 标记行，不存入数据库
+                        analysis = analysis.replaceAll("(?m)^\\[VERDICT:(FALSE_POSITIVE|DEFECT_CONFIRMED)\\]\\s*\n?", "").trim();
+
                         defect.setAiTextAnalysis(analysis);
                         defect.setAiTextSolution(solution);
-                        log.info("AI 多模态分析生成成功");
+                        if (isFalsePositive) {
+                            defect.setIsFalsePositive(true);
+                        }
+                        // 解析 META_JSON（误检类型 & 趋势发展节点）
+                        extractAndSetMeta(defect, fullAnalysis);
+                        log.info("AI 多模态分析生成成功，误判={}", isFalsePositive);
                     } catch (Exception e) {
                         log.warn("生成 AI 分析失败: {}", e.getMessage());
                     }
@@ -280,6 +301,36 @@ public class RemoteImportServiceImpl implements RemoteImportService {
         } catch (IOException e) {
             log.error("读取图片文件失败: {}", imagePath, e);
             return null;
+        }
+    }
+
+    /**
+     * 从千问输出中提取 ---META_JSON--- 段（若存在），写入 defect.misdetectionType / defect.severityTimeline
+     */
+    private void extractAndSetMeta(Defect defect, String fullText) {
+        if (fullText == null) return;
+        int idx = fullText.indexOf("---META_JSON---");
+        if (idx < 0) return;
+        String after = fullText.substring(idx + "---META_JSON---".length()).trim();
+        int l = after.indexOf('{');
+        int r = after.lastIndexOf('}');
+        if (l < 0 || r <= l) return;
+        String json = after.substring(l, r + 1);
+        try {
+            java.util.regex.Matcher mType = java.util.regex.Pattern
+                .compile("\"misdetectionType\"\\s*:\\s*\"([^\"]+)\"")
+                .matcher(json);
+            if (mType.find()) {
+                defect.setMisdetectionType(mType.group(1));
+            }
+            java.util.regex.Matcher mTrend = java.util.regex.Pattern
+                .compile("\"trend\"\\s*:\\s*(\\[[\\s\\S]*?\\])")
+                .matcher(json);
+            if (mTrend.find()) {
+                defect.setSeverityTimeline(mTrend.group(1).trim());
+            }
+        } catch (Exception e) {
+            log.warn("解析 META_JSON 失败: {}", e.getMessage());
         }
     }
 }
