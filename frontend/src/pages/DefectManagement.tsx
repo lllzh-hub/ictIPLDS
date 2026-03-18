@@ -274,13 +274,14 @@ const DefectManagement = () => {
     critical: defects.filter(d => d.severity === 'critical').length,
     pending: defects.filter(d => d.status === 'pending').length,
     completed: defects.filter(d => d.status === 'completed').length,
+    falsePositive: defects.filter(d => d.isFalsePositive).length,
   };
 
   return (
     <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* 顶部统计卡片 */}
       <div className="p-6 pb-0">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5 hover:border-cyan-500/50 transition-all group">
             <div className="flex items-center justify-between">
               <div>
@@ -325,6 +326,21 @@ const DefectManagement = () => {
               </div>
               <div className="p-3 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
                 <Icon icon="heroicons:check-circle" className="text-green-400 text-2xl" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5 hover:border-yellow-400/50 transition-all group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-sm mb-1">误判</p>
+                <p className="text-3xl font-bold text-yellow-400">{stats.falsePositive}</p>
+              </div>
+              <div className="p-3 bg-yellow-500/10 rounded-lg group-hover:bg-yellow-500/20 transition-colors">
+                <svg className="w-6 h-6 text-yellow-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M9 12l2 2 4-4"/>
+                </svg>
               </div>
             </div>
           </div>
@@ -502,6 +518,15 @@ const DefectManagement = () => {
                               <h3 className="text-lg font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">
                                 {defect.type}
                               </h3>
+                              {defect.isFalsePositive && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/30" title="AI 判定为误报">
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                    <path d="M9 12l2 2 4-4"/>
+                                  </svg>
+                                  误判
+                                </span>
+                              )}
                             </div>
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full border ${severityConfig.bg} ${severityConfig.text} ${severityConfig.border}`}>
                               <Icon icon={severityConfig.icon} className="text-sm" />

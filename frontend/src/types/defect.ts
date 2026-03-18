@@ -14,6 +14,7 @@ export interface Defect {
   thermalImage?: string;
   aiAnalysis?: string;
   solution?: string;
+  isFalsePositive?: boolean;
 }
 
 export interface DetectionResult {

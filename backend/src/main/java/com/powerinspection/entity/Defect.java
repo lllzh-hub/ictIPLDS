@@ -59,6 +59,9 @@ public class Defect {
     @Column(name = "image_path")
     private String imagePath;
 
+    @Column(name = "is_false_positive")
+    private Boolean isFalsePositive;
+
     @Column(name = "detected_at")
     private LocalDateTime detectedAt;
 

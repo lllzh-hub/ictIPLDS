@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,7 +34,7 @@ public class AIController {
     private String importFolder;
 
     @PostMapping("/analyze")
-    public ResponseEntity<Map<String, String>> analyzeDefect(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> analyzeDefect(@RequestBody Map<String, Object> request) {
         try {
             String taskInfo = (String) request.get("taskInfo");
             Object defectIdObj = request.get("defectId");
@@ -103,15 +104,47 @@ public class AIController {
                 solution = parts.length > 1 ? parts[1].trim() : "";
             }
 
-            logger.info("AI分析成功完成");
-            return ResponseEntity.ok(Map.of(
-                "analysis", analysis,
-                "solution", solution
-            ));
+            // 检测是否为误判：只识别 AI 明确输出的 [VERDICT:FALSE_POSITIVE] 标记
+            boolean isFalsePositive = detectFalsePositive(analysis);
+            // 从 analysis 中移除 verdict 标记行，避免显示在前端
+            analysis = analysis.replaceAll("(?m)^\\[VERDICT:(FALSE_POSITIVE|DEFECT_CONFIRMED)\\]\\s*\n?", "").trim();
+            logger.info("AI分析成功完成，误判={}", isFalsePositive);
+
+            // 如果传入了 defectId，将误判标记持久化到数据库
+            if (defectIdObj != null && isFalsePositive) {
+                try {
+                    Long defectId = Long.parseLong(defectIdObj.toString());
+                    Optional<Defect> defectOpt = defectService.getDefectById(defectId);
+                    if (defectOpt.isPresent()) {
+                        Defect defect = defectOpt.get();
+                        defect.setIsFalsePositive(true);
+                        defectService.updateDefect(defectId, defect);
+                        logger.info("已将缺陷 {} 标记为误判", defectId);
+                    }
+                } catch (NumberFormatException e) {
+                    logger.warn("无效的 defectId: {}", defectIdObj);
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("analysis", analysis);
+            result.put("solution", solution);
+            result.put("isFalsePositive", isFalsePositive);
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             logger.error("AI分析失败: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                .body(Map.of("error", "AI 分析失败: " + e.getMessage()));
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("error", "AI 分析失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResult);
         }
+    }
+
+    /**
+     * 判断 AI 分析结果中是否包含误判结论。
+     * 只识别 AI 明确输出的 [VERDICT:FALSE_POSITIVE] 标记，避免误匹配正常分析中的"误判"词语。
+     */
+    private boolean detectFalsePositive(String analysis) {
+        if (analysis == null || analysis.isBlank()) return false;
+        return analysis.contains("[VERDICT:FALSE_POSITIVE]");
     }
 }

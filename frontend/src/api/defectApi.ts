@@ -70,6 +70,7 @@ export interface Defect {
   solution?: string;       // 红外检测框数据（JSON 数组）
   aiTextAnalysis?: string; // AI 文本分析
   aiTextSolution?: string; // AI 文本解决方案
+  isFalsePositive?: boolean; // 是否为误判
 }
 
 export interface DetectionResult {
@@ -151,6 +152,7 @@ export interface AIAnalysisRequest {
 export interface AIAnalysisResponse {
   analysis: string;
   solution: string;
+  isFalsePositive?: boolean;
   error?: string;
 }
 

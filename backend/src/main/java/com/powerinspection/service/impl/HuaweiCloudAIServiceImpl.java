@@ -33,17 +33,18 @@ public class HuaweiCloudAIServiceImpl implements AIService {
         "2. 原始图片（可见光）\n" +
         "3. 红外热成像图片（如有）\n\n" +
         "你的任务：\n" +
-        "首先，根据图片内容独立判断是否存在真实缺陷。\n" +
-        "- 如果图片中确实存在缺陷，结合检测结果给出详细分析。\n" +
-        "- 如果图片中没有明显缺陷（检测模型误判），直接说明为误判。\n\n" +
-        "回答必须包含以下5个部分（用数字+点号开头，要点用•开头）：\n" +
+        "仔细观察图片内容，独立判断是否存在真实缺陷（不要只依赖检测模型结果）。\n\n" +
+        "【重要】你的回答第一行必须是以下两者之一（不得省略，不得修改格式）：\n" +
+        "- 如果图片中确实存在真实缺陷：输出 [VERDICT:DEFECT_CONFIRMED]\n" +
+        "- 如果图片中没有明显缺陷（检测模型误判）：输出 [VERDICT:FALSE_POSITIVE]\n\n" +
+        "第一行之后，再输出以下5个部分（用数字+点号开头，要点用•开头）：\n" +
         "1. 缺陷原因分析\n" +
         "2. 风险评估\n" +
         "3. 处理建议\n" +
         "---SOLUTION_SPLIT---\n" +
         "4. 维修方案\n" +
         "5. 预防措施\n\n" +
-        "如果判断为误判，则：\n" +
+        "如果判断为 [VERDICT:FALSE_POSITIVE]，则后续内容简化为：\n" +
         "1. 缺陷原因分析\n" +
         "• 经图像分析，未发现明显缺陷，本次为误判。\n" +
         "2. 风险评估\n" +
@@ -182,7 +183,8 @@ public class HuaweiCloudAIServiceImpl implements AIService {
         logger.info("使用演示模式生成分析结果");
 
         if (taskInfo.startsWith("[无缺陷]")) {
-            return "1. 缺陷原因分析\n" +
+            return "[VERDICT:FALSE_POSITIVE]\n" +
+                   "1. 缺陷原因分析\n" +
                    "• 经图像分析，未发现明显缺陷，本次为误判。\n\n" +
                    "2. 风险评估\n" +
                    "• 当前风险等级：无风险，设备状态正常。\n" +
@@ -202,7 +204,8 @@ public class HuaweiCloudAIServiceImpl implements AIService {
             return "你好！我是AI智能助手，专门帮助分析电力设备缺陷问题。";
         }
 
-        return "1. 缺陷原因分析\n" +
+        return "[VERDICT:DEFECT_CONFIRMED]\n" +
+               "1. 缺陷原因分析\n" +
                "• 设备长期运行导致的自然老化\n" +
                "• 环境因素影响（温度、湿度、污染）\n" +
                "• 维护保养周期可能需要调整\n\n" +

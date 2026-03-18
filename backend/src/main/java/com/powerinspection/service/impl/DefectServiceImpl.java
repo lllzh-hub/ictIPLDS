@@ -96,6 +96,15 @@ public class DefectServiceImpl implements DefectService {
             if (defect.getImagePath() != null) {
                 existingDefect.setImagePath(defect.getImagePath());
             }
+            if (defect.getAiTextAnalysis() != null) {
+                existingDefect.setAiTextAnalysis(defect.getAiTextAnalysis());
+            }
+            if (defect.getAiTextSolution() != null) {
+                existingDefect.setAiTextSolution(defect.getAiTextSolution());
+            }
+            if (defect.getIsFalsePositive() != null) {
+                existingDefect.setIsFalsePositive(defect.getIsFalsePositive());
+            }
             existingDefect.setUpdatedAt(LocalDateTime.now());
             return defectRepository.save(existingDefect);
         }).orElseThrow(() -> new RuntimeException("缺陷不存在，ID: " + id));

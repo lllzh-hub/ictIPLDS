@@ -1402,6 +1402,215 @@ html, body {
   animation: fadeInUp var(--duration-normal) var(--ease-out);
 }
 
+/* ============================================================
+   误判 (False Positive) 样式
+   ============================================================ */
+
+/* 标题区徽章 - 误判版 */
+.panel-badge-false-positive {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: var(--space-1) var(--space-3);
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  border-radius: var(--radius-md);
+  color: #eab308;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  animation: fpBadgePulse 2.5s ease-in-out infinite;
+}
+
+@keyframes fpBadgePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(234,179,8,0); }
+  50% { opacity: 0.85; box-shadow: 0 0 8px 2px rgba(234,179,8,0.2); }
+}
+
+/* AI loading 状态 */
+.ai-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-3);
+  padding: var(--space-8);
+}
+
+.ai-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-surface-3);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-loading-text {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ai-loading-sub {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* 误判主视图 */
+.false-positive-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+  height: 100%;
+  gap: var(--space-4);
+  text-align: center;
+  animation: fpFadeIn 0.5s var(--ease-out);
+}
+
+@keyframes fpFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fp-icon-wrap {
+  width: 72px;
+  height: 72px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.35);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 24px rgba(34, 197, 94, 0.15);
+}
+
+.fp-shield-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--color-success);
+}
+
+.fp-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: #eab308;
+  letter-spacing: 2px;
+}
+
+.fp-desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  max-width: 240px;
+}
+
+.fp-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+.fp-fields {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+}
+
+.fp-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fp-field-row:last-child {
+  border-bottom: none;
+}
+
+.fp-field-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.fp-field-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.fp-nil {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.fp-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  width: 100%;
+  justify-content: center;
+}
+
+.fp-hint svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* 执行方案 - 误判空状态 */
+.solution-fp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  text-align: center;
+  animation: fpFadeIn 0.5s var(--ease-out);
+}
+
+.solution-fp-icon {
+  color: var(--color-success);
+  opacity: 0.6;
+}
+
+.solution-fp-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.solution-fp-sub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
 @media (max-width: 1200px) {
   .main-container {
     flex-direction: column;

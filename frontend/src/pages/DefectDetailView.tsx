@@ -97,6 +97,7 @@ const DefectDetailView = () => {
         ...defectData,
         aiTextAnalysis: result.analysis,
         aiTextSolution: result.solution,
+        isFalsePositive: result.isFalsePositive ?? false,
       });
       setDefect(updated);
     } catch (error) {
@@ -545,71 +546,127 @@ const DefectDetailView = () => {
                   </svg>
                   AI智能分析
                 </div>
-                <span className="panel-badge">Auto</span>
+                {defect.isFalsePositive ? (
+                  <span className="panel-badge-false-positive">误判</span>
+                ) : (
+                  <span className="panel-badge">Auto</span>
+                )}
               </div>
 
               <div className="analysis-content">
-                {/* 风险可视化 */}
-                <div className="risk-visual">
-                  <div className="risk-meter">
-                    <div className="risk-meter-value">
-                      {defect.severity === 'critical' ? '高' : defect.severity === 'high' ? '中' : '低'}
-                    </div>
-                    <div className="risk-meter-label">当前风险等级</div>
+                {aiLoading ? (
+                  <div className="ai-loading-state">
+                    <div className="ai-loading-spinner"></div>
+                    <p className="ai-loading-text">华为云 Qwen VL 分析中...</p>
+                    <p className="ai-loading-sub">正在识别原图与红外图像</p>
                   </div>
-                  <div className="risk-meter">
-                    <div className="risk-trend">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                        <polyline points="17 6 23 6 23 12"/>
+                ) : defect.isFalsePositive ? (
+                  /* 误判展示 */
+                  <div className="false-positive-view">
+                    <div className="fp-icon-wrap">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="fp-shield-icon">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
                       </svg>
-                      升级趋势
-              </div>
-            </div>
-          </div>
-
-                {/* 负荷趋势图 */}
-                <div className="trend-chart">
-                  <div className="trend-header">
-                    <div className="trend-title">24小时负荷趋势</div>
-                    <div className="trend-live">LIVE</div>
+                    </div>
+                    <div className="fp-label">误判</div>
+                    <div className="fp-desc">AI 分析后认定本次检测为误判，图像中未发现真实缺陷</div>
+                    <div className="fp-divider"></div>
+                    <div className="fp-fields">
+                      <div className="fp-field-row">
+                        <span className="fp-field-label">缺陷类型</span>
+                        <span className="fp-field-value fp-nil">无</span>
+                      </div>
+                      <div className="fp-field-row">
+                        <span className="fp-field-label">风险等级</span>
+                        <span className="fp-field-value fp-nil">无</span>
+                      </div>
+                      <div className="fp-field-row">
+                        <span className="fp-field-label">处理建议</span>
+                        <span className="fp-field-value fp-nil">无</span>
+                      </div>
+                      <div className="fp-field-row">
+                        <span className="fp-field-label">维修方案</span>
+                        <span className="fp-field-value fp-nil">无</span>
+                      </div>
+                      <div className="fp-field-row">
+                        <span className="fp-field-label">预防措施</span>
+                        <span className="fp-field-value fp-nil">无</span>
+                      </div>
+                    </div>
+                    <div className="fp-hint">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                      </svg>
+                      建议将本条记录标记为误报
+                    </div>
                   </div>
-                  <div className="trend-bars">
-                    <div className="trend-bar" style={{ height: '35%' }}></div>
-                    <div className="trend-bar" style={{ height: '50%' }}></div>
-                    <div className="trend-bar high" style={{ height: '75%' }}></div>
-                    <div className="trend-bar high" style={{ height: '85%' }}></div>
-                    <div className="trend-bar current" style={{ height: '90%' }}></div>
-                    <div className="trend-bar" style={{ height: '70%' }}></div>
-                    <div className="trend-bar" style={{ height: '55%' }}></div>
-                    <div className="trend-bar" style={{ height: '40%' }}></div>
-                  </div>
-                  <div className="trend-label">
-                    <span>00:00</span>
-                    <span>06:00</span>
-                    <span>12:00</span>
-                    <span>18:00</span>
-                    <span>当前</span>
-                  </div>
-                </div>
-
-                {/* AI 分析内容 */}
-                {defect.aiTextAnalysis ? (
-                  <div className="space-y-4">
-                    {defect.aiTextAnalysis.split('\n\n').map((section, idx) => (
-                      <div key={idx} className="analysis-section">
-                        <div className="section-title">
-                          {section.split('\n')[0]}
+                ) : (
+                  /* 正常分析展示 */
+                  <>
+                    {/* 风险可视化 */}
+                    <div className="risk-visual">
+                      <div className="risk-meter">
+                        <div className="risk-meter-value">
+                          {defect.severity === 'critical' ? '高' : defect.severity === 'high' ? '中' : '低'}
                         </div>
-                        <div className="analysis-text">
-                          {section.split('\n').slice(1).map((line, lineIdx) => (
-                            line.trim() && <p key={lineIdx}>{line}</p>
-                          ))}
+                        <div className="risk-meter-label">当前风险等级</div>
+                      </div>
+                      <div className="risk-meter">
+                        <div className="risk-trend">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                            <polyline points="17 6 23 6 23 12"/>
+                          </svg>
+                          升级趋势
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : renderAiAnalysis()}
+                    </div>
+
+                    {/* 负荷趋势图 */}
+                    <div className="trend-chart">
+                      <div className="trend-header">
+                        <div className="trend-title">24小时负荷趋势</div>
+                        <div className="trend-live">LIVE</div>
+                      </div>
+                      <div className="trend-bars">
+                        <div className="trend-bar" style={{ height: '35%' }}></div>
+                        <div className="trend-bar" style={{ height: '50%' }}></div>
+                        <div className="trend-bar high" style={{ height: '75%' }}></div>
+                        <div className="trend-bar high" style={{ height: '85%' }}></div>
+                        <div className="trend-bar current" style={{ height: '90%' }}></div>
+                        <div className="trend-bar" style={{ height: '70%' }}></div>
+                        <div className="trend-bar" style={{ height: '55%' }}></div>
+                        <div className="trend-bar" style={{ height: '40%' }}></div>
+                      </div>
+                      <div className="trend-label">
+                        <span>00:00</span>
+                        <span>06:00</span>
+                        <span>12:00</span>
+                        <span>18:00</span>
+                        <span>当前</span>
+                      </div>
+                    </div>
+
+                    {/* AI 分析内容 */}
+                    {defect.aiTextAnalysis ? (
+                      <div className="space-y-4">
+                        {defect.aiTextAnalysis.split('\n\n').map((section, idx) => (
+                          <div key={idx} className="analysis-section">
+                            <div className="section-title">
+                              {section.split('\n')[0]}
+                            </div>
+                            <div className="analysis-text">
+                              {section.split('\n').slice(1).map((line, lineIdx) => (
+                                line.trim() && <p key={lineIdx}>{line}</p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : renderAiAnalysis()}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -626,8 +683,18 @@ const DefectDetailView = () => {
                 </div>
               </div>
 
-              <div className="solution-content">
-                <div className="solution-cards">
+              {defect.isFalsePositive ? (
+                <div className="solution-fp-empty">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="solution-fp-icon">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M9 12l2 2 4-4"/>
+                  </svg>
+                  <p className="solution-fp-text">无需执行方案</p>
+                  <p className="solution-fp-sub">本次检测结果为误判</p>
+                </div>
+              ) : (
+                <div className="solution-content">
+                  <div className="solution-cards">
                     {/* 维修方案卡片 */}
                     <div className="solution-card">
                       <div className="card-header">
@@ -706,7 +773,8 @@ const DefectDetailView = () => {
                       </div>
                     </div>
                   </div>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -748,3 +816,4 @@ const DefectDetailView = () => {
 };
 
 export default DefectDetailView;
+
