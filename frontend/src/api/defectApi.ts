@@ -5,13 +5,21 @@ const API_BASE_URL = 'http://localhost:8080/api';
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=UTF-8',
+    'Accept': 'application/json; charset=UTF-8',
   },
   timeout: 30000,
+  // 确保响应数据以 UTF-8 解析
+  responseType: 'json',
+  responseEncoding: 'utf8',
 });
 
 apiClient.interceptors.request.use(
   (config) => {
+    // 确保请求头中包含 UTF-8 编码信息
+    if (!config.headers['Content-Type']) {
+      config.headers['Content-Type'] = 'application/json; charset=UTF-8';
+    }
     return config;
   },
   (error) => {
@@ -21,6 +29,15 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
+    // 确保响应数据正确编码
+    if (response.data && typeof response.data === 'string') {
+      try {
+        // 如果响应是字符串，尝试解析为 JSON
+        response.data = JSON.parse(response.data);
+      } catch (e) {
+        // 如果不是 JSON，保持原样
+      }
+    }
     return response;
   },
   (error) => {
@@ -138,8 +155,8 @@ export interface AIAnalysisResponse {
 }
 
 export const aiApi = {
-  analyzeDefect: async (taskInfo: string): Promise<AIAnalysisResponse> => {
-    const response = await apiClient.post<AIAnalysisResponse>('/ai/analyze', { taskInfo });
+  analyzeDefect: async (taskInfo: string, defectId?: number): Promise<AIAnalysisResponse> => {
+    const response = await apiClient.post<AIAnalysisResponse>('/ai/analyze', { taskInfo, defectId });
     if (response.data.error) {
       throw new Error(response.data.error);
     }

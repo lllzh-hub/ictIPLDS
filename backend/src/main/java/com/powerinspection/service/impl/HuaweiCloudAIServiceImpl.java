@@ -7,6 +7,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 @Service
@@ -22,58 +26,112 @@ public class HuaweiCloudAIServiceImpl implements AIService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private static final String SYSTEM_PROMPT =
+        "你是一位经验丰富的电力设备缺陷分析专家，同时具备图像识别能力。\n\n" +
+        "你会收到：\n" +
+        "1. 检测模型输出的缺陷识别结果（JSON格式的bbox坐标、类别、置信度）\n" +
+        "2. 原始图片（可见光）\n" +
+        "3. 红外热成像图片（如有）\n\n" +
+        "你的任务：\n" +
+        "首先，根据图片内容独立判断是否存在真实缺陷。\n" +
+        "- 如果图片中确实存在缺陷，结合检测结果给出详细分析。\n" +
+        "- 如果图片中没有明显缺陷（检测模型误判），直接说明为误判。\n\n" +
+        "回答必须包含以下5个部分（用数字+点号开头，要点用•开头）：\n" +
+        "1. 缺陷原因分析\n" +
+        "2. 风险评估\n" +
+        "3. 处理建议\n" +
+        "---SOLUTION_SPLIT---\n" +
+        "4. 维修方案\n" +
+        "5. 预防措施\n\n" +
+        "如果判断为误判，则：\n" +
+        "1. 缺陷原因分析\n" +
+        "• 经图像分析，未发现明显缺陷，本次为误判。\n" +
+        "2. 风险评估\n" +
+        "• 当前风险等级：无风险，设备状态正常。\n" +
+        "3. 处理建议\n" +
+        "• 建议将本条记录标记为误报。\n" +
+        "---SOLUTION_SPLIT---\n" +
+        "4. 维修方案\n" +
+        "• 无需维修。\n" +
+        "5. 预防措施\n" +
+        "• 持续优化检测模型，减少误判率。\n" +
+        "总字数控制在600字以内，语气专业简洁。";
+
     @Override
     public String analyzeDefect(String taskInfo) {
-        logger.info("收到AI分析请求，内容长度: {} 字符", taskInfo.length());
-        logger.debug("分析内容: {}", taskInfo);
+        return analyzeDefectWithImages(taskInfo, Collections.emptyList());
+    }
 
-        // 检查API Key是否有效
+    @Override
+    public String analyzeDefectWithImages(String taskInfo, List<String> imagePaths) {
+        logger.info("收到AI分析请求，内容长度: {} 字符，图片数量: {}", taskInfo.length(), imagePaths.size());
+
         if (apiKey == null || apiKey.isEmpty()) {
             logger.warn("API Key无效，使用演示模式");
             return generateMockAnalysis(taskInfo);
         }
 
         try {
-            logger.info("调用华为云 ModelArts API...");
+            logger.info("调用华为云 ModelArts 多模态 API...");
 
-            // 构建请求
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            // 华为云 ModelArts 使用 X-Auth-Token 或 Authorization Bearer
             if (apiKey.startsWith("Bearer ") || apiKey.startsWith("bearer ")) {
                 headers.set("Authorization", apiKey);
             } else {
                 headers.set("Authorization", "Bearer " + apiKey);
             }
 
-            String systemPrompt = "你是一位经验丰富的电力设备缺陷分析专家。请用专业、简洁的语气分析设备缺陷。\n\n" +
-                "回答格式要求：\n" +
-                "1. 使用清晰的分段结构\n" +
-                "2. 每个部分用数字标题（1. 2. 3. 4. 5.）\n" +
-                "3. 每个部分下用 • 符号列出要点\n" +
-                "4. 每个要点简洁明了，1-2行\n" +
-                "5. 总字数控制在400字以内\n\n" +
-                "必须包含以下5个部分：\n" +
-                "1. 缺陷原因分析\n" +
-                "2. 风险评估\n" +
-                "3. 处理建议\n" +
-                "---SOLUTION_SPLIT---\n" +
-                "4. 维修方案\n" +
-                "5. 预防措施";
-
             Map<String, Object> requestBody = new HashMap<>();
-            List<Map<String, String>> messages = new ArrayList<>();
-            
-            Map<String, String> systemMessage = new HashMap<>();
+            List<Map<String, Object>> messages = new ArrayList<>();
+
+            // system message
+            Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
-            systemMessage.put("content", systemPrompt);
+            systemMessage.put("content", SYSTEM_PROMPT);
             messages.add(systemMessage);
-            
-            Map<String, String> userMessage = new HashMap<>();
+
+            // user message：文字 + 图片
+            Map<String, Object> userMessage = new HashMap<>();
             userMessage.put("role", "user");
-            userMessage.put("content", taskInfo);
+
+            if (imagePaths.isEmpty()) {
+                // 纯文字模式
+                userMessage.put("content", taskInfo);
+            } else {
+                // 多模态模式：content 为数组
+                List<Map<String, Object>> contentList = new ArrayList<>();
+
+                // 先加文字
+                Map<String, Object> textPart = new HashMap<>();
+                textPart.put("type", "text");
+                textPart.put("text", taskInfo);
+                contentList.add(textPart);
+
+                // 再加图片（base64）
+                for (String imgPath : imagePaths) {
+                    try {
+                        byte[] imgBytes = Files.readAllBytes(Paths.get(imgPath));
+                        String base64 = Base64.getEncoder().encodeToString(imgBytes);
+                        String ext = imgPath.substring(imgPath.lastIndexOf('.') + 1).toLowerCase();
+                        String mimeType = ext.equals("png") ? "image/png" : "image/jpeg";
+
+                        Map<String, Object> imgPart = new HashMap<>();
+                        imgPart.put("type", "image_url");
+                        Map<String, String> imgUrl = new HashMap<>();
+                        imgUrl.put("url", "data:" + mimeType + ";base64," + base64);
+                        imgPart.put("image_url", imgUrl);
+                        contentList.add(imgPart);
+                        logger.info("已附加图片: {}, 大小: {} bytes", imgPath, imgBytes.length);
+                    } catch (IOException e) {
+                        logger.warn("读取图片失败，跳过: {} - {}", imgPath, e.getMessage());
+                    }
+                }
+
+                userMessage.put("content", contentList);
+            }
             messages.add(userMessage);
-            
+
             requestBody.put("messages", messages);
             requestBody.put("max_tokens", 2000);
             requestBody.put("temperature", 0.7);
@@ -81,22 +139,11 @@ public class HuaweiCloudAIServiceImpl implements AIService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
 
             logger.info("正在等待AI响应...");
-            
-            // 调用华为云 ModelArts API
-            ResponseEntity<Map> response = restTemplate.postForEntity(
-                endpoint, 
-                request, 
-                Map.class
-            );
+            ResponseEntity<Map> response = restTemplate.postForEntity(endpoint, request, Map.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                Map<String, Object> responseBody = response.getBody();
-                // 根据华为云实际返回格式解析
-                String aiResponse = extractResponse(responseBody);
-                
+                String aiResponse = extractResponse(response.getBody());
                 logger.info("AI分析完成，响应长度: {} 字符", aiResponse.length());
-                logger.debug("AI响应内容: {}", aiResponse);
-                
                 return aiResponse;
             } else {
                 logger.error("华为云API调用失败，状态码: {}", response.getStatusCode());
@@ -109,16 +156,19 @@ public class HuaweiCloudAIServiceImpl implements AIService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private String extractResponse(Map<String, Object> responseBody) {
-        // 根据华为云实际返回格式提取响应内容
-        // 这里需要根据实际API文档调整
         try {
             if (responseBody.containsKey("choices")) {
                 List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
                 if (!choices.isEmpty()) {
                     Map<String, Object> firstChoice = choices.get(0);
-                    Map<String, String> message = (Map<String, String>) firstChoice.get("message");
-                    return message.get("content");
+                    Object messageObj = firstChoice.get("message");
+                    if (messageObj instanceof Map) {
+                        Map<String, Object> message = (Map<String, Object>) messageObj;
+                        Object content = message.get("content");
+                        return content != null ? content.toString() : "AI响应内容为空";
+                    }
                 }
             }
             return "AI响应格式解析失败";
@@ -131,14 +181,25 @@ public class HuaweiCloudAIServiceImpl implements AIService {
     private String generateMockAnalysis(String taskInfo) {
         logger.info("使用演示模式生成分析结果");
 
-        // 简单的关键词检测
-        if (taskInfo.contains("你好") || taskInfo.contains("您好") || taskInfo.contains("hi") || taskInfo.contains("hello")) {
-            return "你好！我是AI智能助手，专门帮助分析电力设备缺陷问题。\n\n" +
-                   "你可以向我描述遇到的设备问题，比如：\n" +
-                   "• 设备异常现象（发热、异响、漏油等）\n" +
-                   "• 设备类型和位置\n" +
-                   "• 发现的时间\n\n" +
-                   "我会帮你分析原因和提供处理建议。";
+        if (taskInfo.startsWith("[无缺陷]")) {
+            return "1. 缺陷原因分析\n" +
+                   "• 经图像分析，未发现明显缺陷，本次为误判。\n\n" +
+                   "2. 风险评估\n" +
+                   "• 当前风险等级：无风险，设备状态正常。\n" +
+                   "• 建议继续按计划进行常规巡检。\n\n" +
+                   "3. 处理建议\n" +
+                   "• 本次告警为误判，建议标记为误报。\n" +
+                   "• 如多次出现误判，建议检查检测模型参数。\n\n" +
+                   "---SOLUTION_SPLIT---\n\n" +
+                   "4. 维修方案\n" +
+                   "• 无需维修，设备状态正常。\n\n" +
+                   "5. 预防措施\n" +
+                   "• 定期开展例行巡检，保持设备清洁。\n" +
+                   "• 记录误判情况，持续优化检测模型。";
+        }
+
+        if (taskInfo.contains("你好") || taskInfo.contains("您好")) {
+            return "你好！我是AI智能助手，专门帮助分析电力设备缺陷问题。";
         }
 
         return "1. 缺陷原因分析\n" +
@@ -160,8 +221,6 @@ public class HuaweiCloudAIServiceImpl implements AIService {
                "5. 预防措施\n" +
                "• 加强后续监控和定期巡检\n" +
                "• 建立设备健康档案\n" +
-               "• 优化维护保养计划\n\n" +
-               "💡 提示：当前为演示模式";
+               "• 优化维护保养计划";
     }
 }
-

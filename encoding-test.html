@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字符编码测试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .test-card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .test-card p {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f093fb;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #e07be0;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .result-box {
+            background: #f5f5f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .result-box.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+
+        .result-box.success {
+            border-left-color: #4caf50;
+            background: #f1f8e9;
+        }
+
+        .result-box.warning {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.success {
+            background: #4caf50;
+        }
+
+        .status-indicator.error {
+            background: #f44336;
+        }
+
+        .status-indicator.warning {
+            background: #ff9800;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .data-table td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .encoding-info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #1565c0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .char-display {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        @media (max-width: 768px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 字符编码诊断工具</h1>
+            <p>快速定位数据乱码问题发生的位置</p>
+        </div>
+
+        <div class="test-grid">
+            <!-- 测试 1: 数据库连接测试 -->
+            <div class="test-card">
+                <h2>📊 数据库查询测试</h2>
+                <p>直接查询数据库中的汉字数据，检查数据库存储是否正确</p>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="testDatabase()">查询数据库</button>
+                    <button class="btn-secondary" onclick="clearResult('dbResult')">清空</button>
+                </div>
+                <div id="dbResult" class="result-box"></div>
+            </div>
+
+            <!-- 测试 2: 后端 API 测试 -->
+            <div class="test-card">
+                <h2>🔗 后端 API 测试</h2>
+                <p>调用后端 API，检查后端返回的数据编码是否正确</p>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="testBackendAPI()">调用 API</button>
+                    <button class="btn-secondary" onclick="clearResult('apiResult')">清空</button>
+                </div>
+                <div id="apiResult" class="result-box"></div>
+            </div>
+
+            <!-- 测试 3: 响应头检查 -->
+            <div class="test-card">
+                <h2>📋 响应头检查</h2>
+                <p>检查 HTTP 响应头中的字符编码信息</p>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="testResponseHeaders()">检查响应头</button>
+                    <button class="btn-secondary" onclick="clearResult('headerResult')">清空</button>
+                </div>
+                <div id="headerResult" class="result-box"></div>
+            </div>
+
+            <!-- 测试 4: 字符编码对比 -->
+            <div class="test-card">
+                <h2>🔤 字符编码对比</h2>
+                <p>对比不同编码方式下的汉字显示效果</p>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="testCharacterEncoding()">显示对比</button>
+                    <button class="btn-secondary" onclick="clearResult('charResult')">清空</button>
+                </div>
+                <div id="charResult" class="result-box"></div>
+            </div>
+
+            <!-- 测试 5: 完整流程测试 -->
+            <div class="test-card full-width">
+                <h2>🚀 完整流程诊断</h2>
+                <p>一键运行所有测试，快速定位问题所在</p>
+                <div class="button-group">
+                    <button class="btn-success" onclick="runFullDiagnosis()">运行完整诊断</button>
+                    <button class="btn-secondary" onclick="clearAllResults()">清空所有</button>
+                </div>
+                <div id="diagnosisResult" class="result-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080/api';
+
+        // 显示加载状态
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '<div class="loading"></div> 加载中...';
+            element.className = 'result-box';
+        }
+
+        // 显示成功结果
+        function showSuccess(elementId, title, content) {
+            const element = document.getElementById(elementId);
+            element.className = 'result-box success';
+            element.innerHTML = `
+                <div class="result-title">
+                    <span class="status-indicator success"></span>
+                    ${title}
+                </div>
+                <pre>${escapeHtml(content)}</pre>
+            `;
+        }
+
+        // 显示错误结果
+        function showError(elementId, title, content) {
+            const element = document.getElementById(elementId);
+            element.className = 'result-box error';
+            element.innerHTML = `
+                <div class="result-title">
+                    <span class="status-indicator error"></span>
+                    ${title}
+                </div>
+                <pre>${escapeHtml(content)}</pre>
+            `;
+        }
+
+        // 显示警告结果
+        function showWarning(elementId, title, content) {
+            const element = document.getElementById(elementId);
+            element.className = 'result-box warning';
+            element.innerHTML = `
+                <div class="result-title">
+                    <span class="status-indicator warning"></span>
+                    ${title}
+                </div>
+                <pre>${escapeHtml(content)}</pre>
+            `;
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // 清空结果
+        function clearResult(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+            document.getElementById(elementId).className = 'result-box';
+        }
+
+        // 清空所有结果
+        function clearAllResults() {
+            clearResult('dbResult');
+            clearResult('apiResult');
+            clearResult('headerResult');
+            clearResult('charResult');
+            clearResult('diagnosisResult');
+        }
+
+        // 测试 1: 数据库查询
+        async function testDatabase() {
+            showLoading('dbResult');
+            try {
+                const response = await fetch(`${API_BASE_URL}/defects`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json; charset=UTF-8',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    let content = `✅ 成功获取 ${data.length} 条数据\n\n`;
+                    content += '前 3 条数据预览:\n';
+                    content += '─'.repeat(80) + '\n\n';
+                    
+                    data.slice(0, 3).forEach((item, index) => {
+                        content += `【数据 ${index + 1}】\n`;
+                        content += `ID: ${item.id}\n`;
+                        content += `类型: ${item.type}\n`;
+                        content += `位置: ${item.location}\n`;
+                        content += `描述: ${item.description}\n`;
+                        content += `状态: ${item.status}\n`;
+                        content += '\n';
+                    });
+
+                    content += '─'.repeat(80) + '\n';
+                    content += '✅ 如果上面的汉字显示正常，说明数据库→后端 OK\n';
+                    content += '❌ 如果上面的汉字显示乱码，说明问题在数据库或后端配置\n';
+
+                    showSuccess('dbResult', '数据库查询成功', content);
+                } else {
+                    showWarning('dbResult', '数据库为空', '数据库中没有数据，请先导入数据');
+                }
+            } catch (error) {
+                showError('dbResult', '查询失败', `错误: ${error.message}`);
+            }
+        }
+
+        // 测试 2: 后端 API
+        async function testBackendAPI() {
+            showLoading('apiResult');
+            try {
+                const response = await fetch(`${API_BASE_URL}/defects`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json; charset=UTF-8',
+                        'Accept': 'application/json; charset=UTF-8',
+                    }
+                });
+
+                const contentType = response.headers.get('content-type');
+                const data = await response.json();
+
+                let content = `✅ API 调用成功\n\n`;
+                content += `状态码: ${response.status}\n`;
+                content += `Content-Type: ${contentType}\n\n`;
+                content += `返回数据条数: ${data.length}\n\n`;
+
+                if (data.length > 0) {
+                    content += '第一条数据详情:\n';
+                    content += '─'.repeat(80) + '\n';
+                    content += JSON.stringify(data[0], null, 2);
+                    content += '\n' + '─'.repeat(80) + '\n\n';
+                    
+                    content += '📊 编码检查:\n';
+                    if (contentType && contentType.includes('charset=UTF-8')) {
+                        content += '✅ Content-Type 包含 charset=UTF-8\n';
+                    } else {
+                        content += '❌ Content-Type 未指定 charset=UTF-8\n';
+                    }
+
+                    // 检查汉字
+                    const firstItem = data[0];
+                    const hasChineseChars = /[\u4e00-\u9fff]/.test(JSON.stringify(firstItem));
+                    if (hasChineseChars) {
+                        content += '✅ 数据中包含汉字\n';
+                    } else {
+                        content += '⚠️ 数据中未检测到汉字\n';
+                    }
+                }
+
+                showSuccess('apiResult', 'API 响应正常', content);
+            } catch (error) {
+                showError('apiResult', 'API 调用失败', `错误: ${error.message}`);
+            }
+        }
+
+        // 测试 3: 响应头
+        async function testResponseHeaders() {
+            showLoading('headerResult');
+            try {
+                const response = await fetch(`${API_BASE_URL}/defects`, {
+                    method: 'GET'
+                });
+
+                let content = `✅ 响应头信息:\n\n`;
+                
+                const headers = {
+                    'Content-Type': response.headers.get('content-type'),
+                    'Content-Encoding': response.headers.get('content-encoding'),
+                    'Transfer-Encoding': response.headers.get('transfer-encoding'),
+                    'Server': response.headers.get('server'),
+                };
+
+                for (const [key, value] of Object.entries(headers)) {
+                    if (value) {
+                        content += `${key}: ${value}\n`;
+                    }
+                }
+
+                content += '\n' + '─'.repeat(80) + '\n\n';
+                content += '📋 编码检查:\n';
+
+                const contentType = response.headers.get('content-type');
+                if (contentType) {
+                    if (contentType.includes('charset=UTF-8')) {
+                        content += '✅ 响应头正确指定了 UTF-8 编码\n';
+                    } else if (contentType.includes('charset')) {
+                        content += `⚠️ 响应头指定了编码，但不是 UTF-8: ${contentType}\n`;
+                    } else {
+                        content += '❌ 响应头未指定字符编码\n';
+                    }
+                } else {
+                    content += '❌ 响应头中没有 Content-Type\n';
+                }
+
+                showSuccess('headerResult', '响应头检查完成', content);
+            } catch (error) {
+                showError('headerResult', '检查失败', `错误: ${error.message}`);
+            }
+        }
+
+        // 测试 4: 字符编码对比
+        function testCharacterEncoding() {
+            const testString = '测试数据：缺陷、维护、巡检';
+            
+            let content = `测试字符串: ${testString}\n\n`;
+            content += '─'.repeat(80) + '\n\n';
+            
+            content += '1️⃣ UTF-8 编码 (正确):\n';
+            content += `   ${testString}\n\n`;
+            
+            content += '2️⃣ 字符编码信息:\n';
+            for (let i = 0; i < testString.length; i++) {
+                const char = testString[i];
+                const code = char.charCodeAt(0);
+                content += `   '${char}' -> U+${code.toString(16).toUpperCase().padStart(4, '0')}\n`;
+            }
+            
+            content += '\n' + '─'.repeat(80) + '\n\n';
+            content += '✅ 如果上面的汉字显示正常，说明浏览器编码 OK\n';
+            content += '❌ 如果上面的汉字显示乱码，说明问题在浏览器或前端\n';
+
+            showSuccess('charResult', '字符编码对比', content);
+        }
+
+        // 完整诊断
+        async function runFullDiagnosis() {
+            showLoading('diagnosisResult');
+            
+            let results = '🔍 开始完整诊断...\n\n';
+            
+            try {
+                // 1. 检查 API 连接
+                results += '【步骤 1】检查 API 连接...\n';
+                const apiResponse = await fetch(`${API_BASE_URL}/defects`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json; charset=UTF-8',
+                    }
+                });
+
+                if (apiResponse.ok) {
+                    results += '✅ API 连接成功\n\n';
+                } else {
+                    results += `❌ API 返回错误: ${apiResponse.status}\n\n`;
+                    showError('diagnosisResult', '诊断失败', results);
+                    return;
+                }
+
+                // 2. 检查响应头
+                results += '【步骤 2】检查响应头编码...\n';
+                const contentType = apiResponse.headers.get('content-type');
+                if (contentType && contentType.includes('charset=UTF-8')) {
+                    results += `✅ 响应头正确: ${contentType}\n\n`;
+                } else {
+                    results += `⚠️ 响应头可能有问题: ${contentType}\n\n`;
+                }
+
+                // 3. 检查数据
+                results += '【步骤 3】检查返回数据...\n';
+                const data = await apiResponse.json();
+                
+                if (data && data.length > 0) {
+                    results += `✅ 成功获取 ${data.length} 条数据\n\n`;
+                    
+                    // 检查汉字
+                    const firstItem = data[0];
+                    const jsonStr = JSON.stringify(firstItem);
+                    const hasChineseChars = /[\u4e00-\u9fff]/.test(jsonStr);
+                    
+                    if (hasChineseChars) {
+                        results += '✅ 数据中包含汉字\n';
+                        results += `   示例: ${firstItem.type || firstItem.description || '(无汉字字段)'}\n\n`;
+                    } else {
+                        results += '❌ 数据中未检测到汉字\n\n';
+                    }
+                } else {
+                    results += '⚠️ 数据库为空\n\n';
+                }
+
+                // 4. 诊断结论
+                results += '【诊断结论】\n';
+                results += '─'.repeat(80) + '\n';
+                
+                if (contentType && contentType.includes('charset=UTF-8') && hasChineseChars) {
+                    results += '✅ 后端配置正确！\n';
+                    results += '   • 响应头包含 charset=UTF-8\n';
+                    results += '   • 数据中包含汉字\n';
+                    results += '   • 如果前端仍显示乱码，问题可能在前端 Axios 配置\n';
+                } else if (!contentType || !contentType.includes('charset=UTF-8')) {
+                    results += '❌ 后端响应头配置有问题\n';
+                    results += '   • 检查 application.properties 中的编码配置\n';
+                    results += '   • 确保 server.servlet.encoding.* 配置正确\n';
+                } else if (!hasChineseChars) {
+                    results += '❌ 数据库或后端处理有问题\n';
+                    results += '   • 检查数据库字符集是否为 utf8mb4\n';
+                    results += '   • 检查数据库连接字符串编码配置\n';
+                }
+
+                showSuccess('diagnosisResult', '诊断完成', results);
+            } catch (error) {
+                results += `❌ 诊断出错: ${error.message}`;
+                showError('diagnosisResult', '诊断失败', results);
+            }
+        }
+    </script>
+</body>
+</html>

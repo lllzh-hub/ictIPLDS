@@ -164,32 +164,66 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                         }
                     }
 
-                    // 自动生成 AI 分析和解决方案
+                    // 自动生成 AI 分析和解决方案（传入图片做多模态分析）
                     try {
-                        String taskInfo = String.format("缺陷类型: %s\n位置: %s\n严重程度: %s\n描述: %s",
-                            defect.getType(),
-                            defect.getLocation(),
-                            defect.getSeverity(),
-                            defect.getDescription() != null ? defect.getDescription() : "无");
-                        
-                        log.info("正在为缺陷生成 AI 分析...");
-                        String fullAnalysis = aiService.analyzeDefect(taskInfo);
-                        
+                        // 判断是否有真实缺陷
+                        boolean hasDefect = detections != null && !detections.isEmpty() &&
+                            detections.stream().anyMatch(d -> {
+                                Object isDefect = d.get("is_defect");
+                                Object score = d.get("score");
+                                return (isDefect == null || Boolean.TRUE.equals(isDefect)) &&
+                                       (score == null || ((Number) score).doubleValue() >= 0.3);
+                            });
+
+                        String taskInfo;
+                        if (!hasDefect) {
+                            taskInfo = "[无缺陷] 本次检测未发现明显缺陷。\n" +
+                                "检测位置: " + defect.getLocation() + "\n" +
+                                "检测结果: " + objectMapper.writeValueAsString(detections != null ? detections : List.of());
+                        } else {
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("检测模型识别结果：\n");
+                            sb.append("缺陷类型: ").append(defect.getType()).append("\n");
+                            sb.append("位置: ").append(defect.getLocation()).append("\n");
+                            sb.append("严重程度: ").append(defect.getSeverity()).append("\n");
+                            sb.append("置信度: ").append(String.format("%.1f%%", defect.getConfidence() * 100)).append("\n");
+                            sb.append("描述: ").append(defect.getDescription() != null ? defect.getDescription() : "无").append("\n");
+                            sb.append("原图检测框(stream1): ").append(objectMapper.writeValueAsString(detections)).append("\n");
+                            if (defect.getSolution() != null) {
+                                sb.append("红外图检测框(stream2): ").append(defect.getSolution()).append("\n");
+                            }
+                            sb.append("\n请结合上方图片，独立判断是否存在真实缺陷，并给出完整分析。");
+                            taskInfo = sb.toString();
+                        }
+
+                        // 收集本地图片路径
+                        List<String> imagePaths = new java.util.ArrayList<>();
+                        if (defect.getImagePath() != null && new java.io.File(defect.getImagePath()).exists()) {
+                            imagePaths.add(defect.getImagePath());
+                        }
+                        // stream2 图片路径
+                        if (stream2ImageFile != null) {
+                            String stream2LocalPath = localImportFolder + "/" + stream2ImageFile;
+                            if (new java.io.File(stream2LocalPath).exists()) {
+                                imagePaths.add(stream2LocalPath);
+                            }
+                        }
+
+                        log.info("正在为缺陷生成 AI 多模态分析，hasDefect={}, 图片数量={}", hasDefect, imagePaths.size());
+                        String fullAnalysis = aiService.analyzeDefectWithImages(taskInfo, imagePaths);
+
                         // 分离 AI 分析和解决方案
                         String analysis = fullAnalysis;
                         String solution = "";
-                        
                         if (fullAnalysis.contains("---SOLUTION_SPLIT---")) {
                             String[] parts = fullAnalysis.split("---SOLUTION_SPLIT---");
                             analysis = parts[0].trim();
                             solution = parts.length > 1 ? parts[1].trim() : "";
                         }
-                        
-                        // 存储 AI 文本分析到新字段
+
                         defect.setAiTextAnalysis(analysis);
                         defect.setAiTextSolution(solution);
-                        
-                        log.info("AI 分析生成成功");
+                        log.info("AI 多模态分析生成成功");
                     } catch (Exception e) {
                         log.warn("生成 AI 分析失败: {}", e.getMessage());
                     }
