@@ -111,6 +111,9 @@ public class DefectServiceImpl implements DefectService {
             if (defect.getSeverityTimeline() != null) {
                 existingDefect.setSeverityTimeline(defect.getSeverityTimeline());
             }
+            if (defect.getSuggestedDeadline() != null) {
+                existingDefect.setSuggestedDeadline(defect.getSuggestedDeadline());
+            }
             existingDefect.setUpdatedAt(LocalDateTime.now());
             return defectRepository.save(existingDefect);
         }).orElseThrow(() -> new RuntimeException("缺陷不存在，ID: " + id));

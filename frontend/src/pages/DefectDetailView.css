@@ -618,6 +618,11 @@ html, body {
   min-height: 0;
 }
 
+.analysis-content:has(.panel-skeleton) {
+  padding: 0;
+  overflow: hidden;
+}
+
 .analysis-section {
   margin-bottom: var(--space-5);
 }
@@ -1400,6 +1405,147 @@ html, body {
   flex: 1;
   min-height: 0;
   animation: fadeInUp var(--duration-normal) var(--ease-out);
+}
+
+/* ============================================================
+   AI 面板缓冲占位样式
+   ============================================================ */
+
+.panel-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 0;
+  padding: 0;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.panel-skeleton-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, rgba(14,165,233,0.07) 0%, transparent 70%);
+  animation: skeletonPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.panel-skeleton-orbit {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+
+.panel-skeleton-orbit-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--color-primary);
+  animation: orbitSpin 1.2s linear infinite;
+}
+
+.panel-skeleton-orbit-ring:nth-child(2) {
+  inset: 10px;
+  border-top-color: rgba(14,165,233,0.5);
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+.panel-skeleton-orbit-ring:nth-child(3) {
+  inset: 22px;
+  border-top-color: rgba(14,165,233,0.25);
+  animation-duration: 2.4s;
+}
+
+.panel-skeleton-orbit-core {
+  position: absolute;
+  inset: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14,165,233,0.4) 0%, rgba(14,165,233,0.1) 100%);
+  animation: corePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes orbitSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes corePulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.panel-skeleton-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.panel-skeleton-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.panel-skeleton-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 70%;
+  position: relative;
+}
+
+.panel-skeleton-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--color-surface-3) 25%, var(--color-surface-2) 50%, var(--color-surface-3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+.panel-skeleton-bar:nth-child(2) { width: 85%; animation-delay: 0.15s; }
+.panel-skeleton-bar:nth-child(3) { width: 60%; animation-delay: 0.3s; }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.panel-skeleton-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 20px;
+  position: relative;
+}
+
+.panel-skeleton-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0.3;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.panel-skeleton-dot:nth-child(2) { animation-delay: 0.2s; }
+.panel-skeleton-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotBounce {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.4); }
 }
 
 /* ============================================================

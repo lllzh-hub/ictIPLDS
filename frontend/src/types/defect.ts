@@ -17,6 +17,7 @@ export interface Defect {
   isFalsePositive?: boolean;
   misdetectionType?: string;
   severityTimeline?: string;
+  suggestedDeadline?: string;
 }
 
 export interface DetectionResult {

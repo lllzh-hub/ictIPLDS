@@ -185,12 +185,12 @@ public class AutoImportServiceImpl implements AutoImportService {
                 log.info("{}，开始导入: {} (remoteMtime={}, lastMtime={})", reason, folder, remoteMtime, lastMtime);
 
                 try {
-                    remoteImportService.importFromFolder(folder);
+                        remoteImportService.importFromFolder(folder);
                     // 导入成功后记录时间线
                     lastImportedMtime.put(folder, remoteMtime);
                     timelineChanged = true;
                     log.info("导入成功，更新时间线: {} -> {}", folder, remoteMtime);
-                } catch (Exception e) {
+                    } catch (Exception e) {
                     log.error("导入文件夹失败，不更新时间线: {} - {}", folder, e.getMessage());
                 }
             }

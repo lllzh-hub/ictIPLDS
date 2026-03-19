@@ -54,6 +54,7 @@ public class HuaweiCloudAIServiceImpl implements AIService {
         "    ...\n" +
         "  ]\n" +
         "}\n" +
+        "  \"suggestedDeadline\": \"<建议最迟处理时限，从以下选一：立即处理/24小时内/72小时内/7天内/30天内>\",\n" +
         "【trend 填写规则（必须严格遵守）】\n" +
         "1. 根据本次缺陷的实际类型和严重程度，自主判断合理的时间节点，禁止使用固定的0/1/2/3年。\n" +
         "2. 节点数量为4~7个，第一个节点必须为 tYears:0（代表当前检测时刻），之后时间严格递增。\n" +

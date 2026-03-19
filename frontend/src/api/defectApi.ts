@@ -73,6 +73,7 @@ export interface Defect {
   isFalsePositive?: boolean; // 是否为误判
   misdetectionType?: string; // 误检类型（千问 META_JSON）
   severityTimeline?: string; // 趋势发展节点 JSON（千问 META_JSON 的 trend 数组）
+  suggestedDeadline?: string; // 千问建议处理时限
 }
 
 export interface DetectionResult {

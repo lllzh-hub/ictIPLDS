@@ -329,6 +329,12 @@ public class RemoteImportServiceImpl implements RemoteImportService {
             if (mTrend.find()) {
                 defect.setSeverityTimeline(mTrend.group(1).trim());
             }
+            java.util.regex.Matcher mDeadline = java.util.regex.Pattern
+                .compile("\"suggestedDeadline\"\\s*:\\s*\"([^\"]+)\"")
+                .matcher(json);
+            if (mDeadline.find()) {
+                defect.setSuggestedDeadline(mDeadline.group(1));
+            }
         } catch (Exception e) {
             log.warn("解析 META_JSON 失败: {}", e.getMessage());
         }

@@ -62,9 +62,11 @@ const DefectDetailView = () => {
   }, [activeImage]);
 
   const [aiLoading, setAiLoading] = useState(false);
+  const [panelReady, setPanelReady] = useState(false);
 
   const loadDefect = async (defectId: number) => {
     setLoading(true);
+    setPanelReady(false);
     try {
       const data = await defectApi.getDefectById(defectId);
       setDefect(data);
@@ -79,8 +81,11 @@ const DefectDetailView = () => {
       if (!data.aiTextAnalysis && data.id) {
         generateAiAnalysis(data);
       }
+      // 3秒缓冲，模拟 AI 面板加载
+      setTimeout(() => setPanelReady(true), 3000);
     } catch (error) {
       console.error('加载缺陷详情失败:', error);
+      setPanelReady(true);
     } finally {
       setLoading(false);
     }
@@ -732,18 +737,39 @@ const DefectDetailView = () => {
             </div>
           </div>
           <div className="status-right">
-            <div className="status-badge">待处理</div>
+            <div className="status-badge" style={{
+              background: defect.status === 'completed' ? 'rgba(34,197,94,0.15)' : defect.status === 'in-progress' ? 'rgba(14,165,233,0.15)' : 'rgba(251,191,36,0.15)',
+              borderColor: defect.status === 'completed' ? 'rgba(34,197,94,0.3)' : defect.status === 'in-progress' ? 'rgba(14,165,233,0.3)' : 'rgba(251,191,36,0.3)',
+              color: defect.status === 'completed' ? '#22c55e' : defect.status === 'in-progress' ? '#0ea5e9' : '#fbbf24',
+            }}>
+              {defect.status === 'completed' ? '已完成' : defect.status === 'in-progress' ? '处理中' : defect.status === 'review' ? '审核中' : '待处理'}
+            </div>
             <div className="quick-metrics">
               <div className="metric-item">
-                <div className="metric-value">{(defect.confidence ? defect.confidence * 100 : 0).toFixed(1)}%</div>
+                <div className="metric-value" style={{ color: (() => {
+                  const c = defect.confidence ?? 0;
+                  const pct = c > 1 ? c : c * 100;
+                  return pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                })() }}>
+                  {(() => {
+                    const c = defect.confidence ?? 0;
+                    return (c > 1 ? c : c * 100).toFixed(1);
+                  })()}%
+                </div>
                 <div className="metric-label">置信度</div>
               </div>
               <div className="metric-item">
-                <div className="metric-value">{defect.severity}</div>
+                <div className="metric-value" style={{ color: defect.severity === 'critical' ? '#ef4444' : defect.severity === 'high' ? '#f97316' : defect.severity === 'medium' ? '#f59e0b' : '#22c55e' }}>
+                  {defect.severity === 'critical' ? '高危' : defect.severity === 'high' ? '严重' : defect.severity === 'medium' ? '中等' : '轻微'}
+                </div>
                 <div className="metric-label">风险等级</div>
               </div>
               <div className="metric-item">
-                <div className="metric-value">24h</div>
+                <div className="metric-value" style={{ color: defect.severity === 'critical' ? '#ef4444' : defect.severity === 'high' ? '#f97316' : '#f59e0b' }}>
+                  {defect.suggestedDeadline
+                    ? defect.suggestedDeadline
+                    : defect.severity === 'critical' ? '立即' : defect.severity === 'high' ? '24h' : defect.severity === 'medium' ? '72h' : '7天'}
+                </div>
                 <div className="metric-label">建议处理</div>
               </div>
             </div>
@@ -949,7 +975,29 @@ const DefectDetailView = () => {
               </div>
 
               <div className="analysis-content">
-                {aiLoading ? (
+                {!panelReady ? (
+                  <div className="panel-skeleton">
+                    <div className="panel-skeleton-bg"/>
+                    <div className="panel-skeleton-orbit">
+                      <div className="panel-skeleton-orbit-ring"/>
+                      <div className="panel-skeleton-orbit-ring"/>
+                      <div className="panel-skeleton-orbit-ring"/>
+                      <div className="panel-skeleton-orbit-core"/>
+                    </div>
+                    <div className="panel-skeleton-title">AI 智能分析中</div>
+                    <div className="panel-skeleton-sub">正在处理图像特征与缺陷数据</div>
+                    <div className="panel-skeleton-bars">
+                      <div className="panel-skeleton-bar"/>
+                      <div className="panel-skeleton-bar"/>
+                      <div className="panel-skeleton-bar"/>
+                    </div>
+                    <div className="panel-skeleton-dots">
+                      <div className="panel-skeleton-dot"/>
+                      <div className="panel-skeleton-dot"/>
+                      <div className="panel-skeleton-dot"/>
+                    </div>
+                  </div>
+                ) : aiLoading ? (
                   <div className="ai-loading-state">
                     <div className="ai-loading-spinner"></div>
                     <p className="ai-loading-text">华为云 Qwen VL 分析中...</p>
@@ -1037,7 +1085,29 @@ const DefectDetailView = () => {
                 </div>
               </div>
 
-              {defect.isFalsePositive ? (
+              {!panelReady ? (
+                <div className="panel-skeleton">
+                  <div className="panel-skeleton-bg"/>
+                  <div className="panel-skeleton-orbit">
+                    <div className="panel-skeleton-orbit-ring"/>
+                    <div className="panel-skeleton-orbit-ring"/>
+                    <div className="panel-skeleton-orbit-ring"/>
+                    <div className="panel-skeleton-orbit-core"/>
+                  </div>
+                  <div className="panel-skeleton-title">执行方案生成中</div>
+                  <div className="panel-skeleton-sub">正在综合缺陷数据与历史案例</div>
+                  <div className="panel-skeleton-bars">
+                    <div className="panel-skeleton-bar"/>
+                    <div className="panel-skeleton-bar"/>
+                    <div className="panel-skeleton-bar"/>
+                  </div>
+                  <div className="panel-skeleton-dots">
+                    <div className="panel-skeleton-dot"/>
+                    <div className="panel-skeleton-dot"/>
+                    <div className="panel-skeleton-dot"/>
+                  </div>
+                </div>
+              ) : defect.isFalsePositive ? (
                 <div className="solution-fp-empty">
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="solution-fp-icon">
                     <circle cx="12" cy="12" r="10"/>
@@ -1085,17 +1155,32 @@ const DefectDetailView = () => {
                       </div>
                       <div className="card-content">
                         <ul className="emergency-list">
-                          {defect.aiTextAnalysis
-                            ? defect.aiTextAnalysis.replace(/\\n/g, '\n').split('\n').filter(l => l.trim().startsWith('•')).slice(4, 8).map((l, i) => (
-                                <li key={i}>{l.replace('•', '').trim()}</li>
-                              ))
-                            : [
-                                '建立线路负荷动态监测机制，设置过载警阈值',
-                                '每半年开展一次红外巡检，重点监测负荷线路和关键节点',
-                                '加强运维人员培训，提升对过载断路器故障的识别能力',
-                                '优化变电站负荷分配策略，避免单线长期高负荷运行',
-                              ].map((item, i) => <li key={i}>{item}</li>)
-                          }
+                          {(() => {
+                            const defaultItems = [
+                              '建立线路负荷动态监测机制，设置过载预警阈值',
+                              '每半年开展一次红外巡检，重点监测负荷线路和关键节点',
+                              '加强运维人员培训，提升对过载断路器故障的识别能力',
+                              '优化变电站负荷分配策略，避免单线长期高负荷运行',
+                              '完善设备健康档案，跟踪缺陷发展趋势',
+                            ];
+                            // 优先从 aiTextSolution 的第5段（预防措施）提取
+                            if (defect.aiTextSolution) {
+                              const normalized = defect.aiTextSolution.replace(/\\n/g, '\n');
+                              const match = normalized.match(/5\..*?(?=---META_JSON---|$)/s);
+                              if (match) {
+                                const bullets = match[0].split('\n').filter((l: string) => l.trim().startsWith('•')).map((l: string) => l.replace('•', '').trim());
+                                if (bullets.length > 0) return bullets.map((item: string, i: number) => <li key={i}>{item}</li>);
+                              }
+                            }
+                            // 次优从 aiTextAnalysis 的 bullet 中取后几条
+                            if (defect.aiTextAnalysis) {
+                              const normalized = defect.aiTextAnalysis.replace(/\\n/g, '\n');
+                              const bullets = normalized.split('\n').filter((l: string) => l.trim().startsWith('•')).map((l: string) => l.replace('•', '').trim());
+                              if (bullets.length > 4) return bullets.slice(4, 9).map((item: string, i: number) => <li key={i}>{item}</li>);
+                            }
+                            // 无数据时使用预置
+                            return defaultItems.map((item, i) => <li key={i}>{item}</li>);
+                          })()}
                         </ul>
                       </div>
                     </div>

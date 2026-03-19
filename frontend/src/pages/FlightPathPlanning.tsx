@@ -210,14 +210,22 @@ export default function FlightPathPlanning() {
 
     const loadAMap = () => {
       return new Promise<void>((resolve, reject) => {
-        // 强制删除已加载的 AMap，确保重新加载
+        // 如果 AMap 已加载，直接 resolve
         if (window.AMap) {
-          delete (window as any).AMap;
+          resolve();
+          return;
         }
-        
+        // 避免重复插入 script 标签
+        const existing = document.querySelector('script[data-amap]');
+        if (existing) {
+          existing.addEventListener('load', () => resolve());
+          existing.addEventListener('error', () => reject(new Error('AMap load failed')));
+          return;
+        }
         const script = document.createElement('script');
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor&_t=${Math.random()}`;
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PolygonEditor`;
         script.async = true;
+        script.setAttribute('data-amap', 'true');
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('AMap load failed'));
         document.head.appendChild(script);

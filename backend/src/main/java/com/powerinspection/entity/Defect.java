@@ -73,6 +73,10 @@ public class Defect {
     @Column(name = "severity_timeline", columnDefinition = "TEXT")
     private String severityTimeline;
 
+    /** 千问建议处理时限，如"立即处理"、"24小时内"、"72小时内"、"7天内"、"30天内" */
+    @Column(name = "suggested_deadline")
+    private String suggestedDeadline;
+
     @Column(name = "detected_at")
     private LocalDateTime detectedAt;
 
