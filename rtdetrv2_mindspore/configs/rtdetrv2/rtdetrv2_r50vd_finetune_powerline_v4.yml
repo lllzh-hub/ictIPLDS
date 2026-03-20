@@ -1,0 +1,72 @@
+__include__: [
+  '../dataset/coco_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetrv2_r50vd.yml',
+]
+
+# 微调配置 - 电力线数据集 v4（8类）
+output_dir: ./output/rtdetrv2_r50vd_finetune_powerline_v4
+
+# 数据集类别数 - 8类
+# 0: cable_defectueux
+# 1: isolateur_manquant
+# 2: rouille
+# 3: Broken shell
+# 4: nest
+# 5: Flashover damage shell
+# 6: kite
+# 7: trash
+num_classes: 8
+remap_mscoco_category: False
+
+# 训练集
+train_dataloader:
+  dataset:
+    img_folder: /data/serverI/powerline/images/train
+    ann_file: /data/serverI/powerline/annotations_train.json
+  total_batch_size: 4
+  num_workers: 4
+
+# 验证集
+val_dataloader:
+  dataset:
+    img_folder: /data/serverI/powerline/images/test
+    ann_file: /data/serverI/powerline/annotations_test.json
+  total_batch_size: 4
+  num_workers: 4
+
+# 优化器（从头微调，使用较小学习率）
+optimizer:
+  type: AdamW
+  params:
+    -
+      params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.000005
+    -
+      params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bn)).*$'
+      weight_decay: 0.
+  lr: 0.00005
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
+# 训练轮数
+# 微调建议：数据量<500张用200轮，500-2000张用120轮，>2000张用72轮
+epochs: 120
+
+# lr 在第 90 轮降一次（乘以 0.1）
+lr_scheduler:
+  type: MultiStepLR
+  milestones: [90]
+  gamma: 0.1
+
+# warmup 500 步即可（数据集小，不需要太长 warmup）
+lr_warmup_scheduler:
+  type: LinearWarmup
+  warmup_duration: 500
+
+# 不使用预训练主干（从 last.pth 微调，backbone 权重已包含）
+# 单卡训练关闭 sync_bn（多卡才需要）
+sync_bn: False
+

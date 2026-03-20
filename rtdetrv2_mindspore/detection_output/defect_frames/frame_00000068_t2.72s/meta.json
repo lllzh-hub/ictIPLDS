@@ -1,0 +1,25 @@
+{
+  "frame_index": 68,
+  "infer_index": 68,
+  "timestamp_sec": 2.72,
+  "has_defect": true,
+  "detection_count": 1,
+  "detections": [
+    {
+      "class_id": 6,
+      "class_name": "kite",
+      "score": 0.4072,
+      "bbox_xyxy": [
+        147.62,
+        85.62,
+        644.5,
+        501.5
+      ],
+      "is_defect": true
+    }
+  ],
+  "image_raw": "detection_output/defect_frames/frame_00000068_t2.72s/raw.jpg",
+  "image_vis": "detection_output/defect_frames/frame_00000068_t2.72s/vis.jpg",
+  "json_path": "detection_output/defect_frames/frame_00000068_t2.72s/meta.json",
+  "screenshot": "detection_output/defect_frames/frame_00000068_t2.72s/vis.jpg"
+}

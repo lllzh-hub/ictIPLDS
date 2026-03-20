@@ -1,0 +1,25 @@
+{
+  "frame_index": 60,
+  "infer_index": 60,
+  "timestamp_sec": 2.4,
+  "has_defect": true,
+  "detection_count": 1,
+  "detections": [
+    {
+      "class_id": 1,
+      "class_name": "isolateur_manquant",
+      "score": 0.4873,
+      "bbox_xyxy": [
+        222.0,
+        7.89,
+        303.25,
+        165.0
+      ],
+      "is_defect": true
+    }
+  ],
+  "image_raw": "detection_output/defect_frames/frame_00000060_t2.40s/raw.jpg",
+  "image_vis": "detection_output/defect_frames/frame_00000060_t2.40s/vis.jpg",
+  "json_path": "detection_output/defect_frames/frame_00000060_t2.40s/meta.json",
+  "screenshot": "detection_output/defect_frames/frame_00000060_t2.40s/vis.jpg"
+}

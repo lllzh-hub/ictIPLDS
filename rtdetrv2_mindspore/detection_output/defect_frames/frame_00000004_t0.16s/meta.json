@@ -1,0 +1,25 @@
+{
+  "frame_index": 4,
+  "infer_index": 4,
+  "timestamp_sec": 0.16,
+  "has_defect": true,
+  "detection_count": 1,
+  "detections": [
+    {
+      "class_id": 0,
+      "class_name": "cable_defectueux",
+      "score": 0.8555,
+      "bbox_xyxy": [
+        269.5,
+        243.25,
+        653.0,
+        350.5
+      ],
+      "is_defect": true
+    }
+  ],
+  "image_raw": "detection_output/defect_frames/frame_00000004_t0.16s/raw.jpg",
+  "image_vis": "detection_output/defect_frames/frame_00000004_t0.16s/vis.jpg",
+  "json_path": "detection_output/defect_frames/frame_00000004_t0.16s/meta.json",
+  "screenshot": "detection_output/defect_frames/frame_00000004_t0.16s/vis.jpg"
+}

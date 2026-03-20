@@ -1,0 +1,73 @@
+{
+  "frame_index": 11,
+  "infer_index": 11,
+  "timestamp_sec": 1.0991,
+  "has_defect": true,
+  "detection_count": 5,
+  "detections": [
+    {
+      "class_id": 5,
+      "class_name": "Flashover damage shell",
+      "score": 0.4727,
+      "bbox_xyxy": [
+        313.75,
+        168.62,
+        352.0,
+        260.25
+      ],
+      "is_defect": true
+    },
+    {
+      "class_id": 5,
+      "class_name": "Flashover damage shell",
+      "score": 0.437,
+      "bbox_xyxy": [
+        302.5,
+        92.38,
+        347.5,
+        433.0
+      ],
+      "is_defect": true
+    },
+    {
+      "class_id": 5,
+      "class_name": "Flashover damage shell",
+      "score": 0.437,
+      "bbox_xyxy": [
+        302.5,
+        92.38,
+        347.5,
+        433.0
+      ],
+      "is_defect": true
+    },
+    {
+      "class_id": 5,
+      "class_name": "Flashover damage shell",
+      "score": 0.437,
+      "bbox_xyxy": [
+        302.5,
+        92.38,
+        347.5,
+        433.0
+      ],
+      "is_defect": true
+    },
+    {
+      "class_id": 5,
+      "class_name": "Flashover damage shell",
+      "score": 0.437,
+      "bbox_xyxy": [
+        302.5,
+        92.38,
+        347.5,
+        433.0
+      ],
+      "is_defect": true
+    }
+  ],
+  "image_raw": "detection_output_video02/defect_frames/frame_00000011_t1.10s/raw.jpg",
+  "image_vis": "detection_output_video02/defect_frames/frame_00000011_t1.10s/vis.jpg",
+  "json_path": "detection_output_video02/defect_frames/frame_00000011_t1.10s/meta.json",
+  "screenshot": "detection_output_video02/defect_frames/frame_00000011_t1.10s/vis.jpg"
+}

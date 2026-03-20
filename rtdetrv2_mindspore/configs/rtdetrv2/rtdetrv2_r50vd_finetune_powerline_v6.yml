@@ -1,0 +1,130 @@
+__include__: [
+  '../dataset/coco_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetrv2_r50vd.yml',
+]
+
+# 微调配置 - 电力线数据集 v6
+# 改进：DFL Loss + 4*reg_max 回归头 + 更好的AP75性能
+# 相比v5：用DFL替代L1 Loss，扩展回归头维度以提高高IoU阈值精度
+output_dir: ./output/rtdetrv2_r50vd_finetune_powerline_v6
+
+num_classes: 8
+remap_mscoco_category: False
+
+# 训练集
+train_dataloader:
+  dataset:
+    img_folder: /data/serverI/powerline/images/train
+    ann_file: /data/serverI/powerline/annotations_train.json
+  total_batch_size: 4
+  num_workers: 4
+
+# 验证集
+val_dataloader:
+  dataset:
+    img_folder: /data/serverI/powerline/images/test
+    ann_file: /data/serverI/powerline/annotations_test.json
+  total_batch_size: 4
+  num_workers: 4
+
+# 优化器
+optimizer:
+  type: AdamW
+  params:
+    -
+      params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.000005
+    -
+      params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bn)).*$'
+      weight_decay: 0.
+  lr: 0.0001
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
+# 训练轮数
+epochs: 120
+
+# lr 分两段衰减
+lr_scheduler:
+  type: MultiStepLR
+  milestones: [80, 100]
+  gamma: 0.1
+
+# warmup 1000 步
+lr_warmup_scheduler:
+  type: LinearWarmup
+  warmup_duration: 1000
+
+# 单卡训练关闭 sync_bn
+sync_bn: False
+
+# ============ 模型配置 ============
+# 使用DFL版本的decoder和criterion
+model: RTDETR
+criterion: RTDETRCriterionv2DFL
+postprocessor: RTDETRPostProcessor
+
+use_focal_loss: True
+eval_spatial_size: [640, 640]
+
+RTDETR: 
+  backbone: PResNet
+  encoder: HybridEncoder
+  decoder: RTDETRTransformerv2DFL
+
+PResNet:
+  depth: 50
+  variant: d
+  freeze_at: 0
+  return_idx: [1, 2, 3]
+  num_stages: 4
+  freeze_norm: True
+  pretrained: False
+
+HybridEncoder:
+  in_channels: [512, 1024, 2048]
+  feat_strides: [8, 16, 32]
+  hidden_dim: 256
+  use_encoder_idx: [2]
+  num_encoder_layers: 1
+  nhead: 8
+  dim_feedforward: 1024
+  dropout: 0.
+  enc_act: 'gelu'
+  expansion: 1.0
+  depth_mult: 1
+  act: 'silu'
+
+RTDETRTransformerv2DFL:
+  feat_channels: [256, 256, 256]
+  feat_strides: [8, 16, 32]
+  hidden_dim: 256
+  num_levels: 3
+  num_layers: 6
+  num_queries: 300
+  num_denoising: 100
+  label_noise_ratio: 0.5
+  box_noise_scale: 1.0
+  eval_idx: -1
+  num_points: [4, 4, 4]
+  cross_attn_method: default
+  query_select_method: default
+  reg_max: 16
+
+RTDETRPostProcessor:
+  num_top_queries: 300
+
+RTDETRCriterionv2DFL:
+  weight_dict: {loss_focal: 1, loss_dfl: 4, loss_giou: 2}
+  losses: ['focal', 'boxes']
+  alpha: 0.2
+  gamma: 2.0
+  reg_max: 16
+  matcher:
+    type: HungarianMatcher
+    weight_dict: {cost_class: 2, cost_bbox: 5, cost_giou: 4}
+    alpha: 0.25
+    gamma: 2.0

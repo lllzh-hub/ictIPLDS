@@ -1,0 +1,50 @@
+task: detection
+num_classes: 12
+remap_m_to_n: True
+names: ['nest', 'kite', 'trash', 'balloon', '电缆破损', '绝缘子破损', '正常电缆', '正常绝缘子', '杆塔', '植被遮挡', '绝缘子闪络', '绝缘子外壳破损']
+
+dataset:
+  type: CocoDetection
+  # 修正1：这里指向训练集图片所在的具体文件夹
+  img_folder: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/train/images
+  ann_file: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/train/annotations.json
+  return_masks: False
+  transforms:
+    type: Compose
+    ops: ~ 
+
+train_dataloader:
+  type: DataLoader
+  dataset: 
+    type: CocoDetection
+    # 修正2：同上，指向训练集图片文件夹
+    img_folder: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/train/images
+    ann_file: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/train/annotations.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: True
+  batch_size: 16 
+  num_workers: 4
+  drop_last: True 
+  collate_fn:
+    type: BatchImageCollateFunction
+
+val_dataloader:
+  type: DataLoader
+  dataset: 
+    type: CocoDetection
+    # 修正3：验证集图片通常在 val/images (如果你的数据集结构是这样的话)
+    img_folder: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/val/images
+    ann_file: /data/serverI/merged_powerline_dataset_coco/merged_powerline_dataset_coco/val/annotations.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: False
+  batch_size: 8
+  num_workers: 4
+  drop_last: False
+  collate_fn:
+    type: BatchImageCollateFunction

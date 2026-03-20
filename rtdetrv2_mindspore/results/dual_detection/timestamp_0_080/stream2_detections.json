@@ -1,0 +1,20 @@
+{
+  "stream_id": 2,
+  "frame": 2,
+  "video_time": 0.08,
+  "detection_timestamp": "2026-03-16T01:58:20.706461",
+  "detections": [
+    {
+      "class_id": 1,
+      "class_name": "class_1",
+      "score": 0.458,
+      "bbox_xyxy": [
+        468.0,
+        246.88,
+        599.0,
+        327.0
+      ],
+      "is_defect": true
+    }
+  ]
+}

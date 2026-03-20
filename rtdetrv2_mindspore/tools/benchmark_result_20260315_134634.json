@@ -1,0 +1,13 @@
+{
+  "benchmark_time": "2026-03-15 13:46:22",
+  "config": "configs/rtdetrv2/rtdetrv2_r50vd_finetune_powerline_v6.yml",
+  "resume": "weights/powerlinev3.ckpt",
+  "input_size": "640x640",
+  "warmup_iters": 3,
+  "measure_iters": 20,
+  "results": {
+    "npu": {
+      "error": "The name '_ms' is not defined, or not supported in graph mode.\n\n----------------------------------------------------\n- C++ Call Stack: (For framework developers)\n----------------------------------------------------\nmindspore/ccsrc/pipeline/jit/ps/parse/function_block.cc:377 CheckUndefinedSymbol\n\n----------------------------------------------------\n- The Traceback of Net Construct Code:\n----------------------------------------------------\n# 0 In file /home/HwHiAiUser/rtdetrv2_mindspore/tools/benchmark_npu_vs_cpu.py:228, 22~40\n            outputs = self.model(images)\r\n                      ^~~~~~~~~~~~~~~~~~\n# 1 In file /home/HwHiAiUser/rtdetrv2_mindspore/tools/../src/zoo/rtdetr/rtdetr.py:33, 12~28\n        x = self.backbone(x)\n            ^~~~~~~~~~~~~~~~\n# 2 In file /home/HwHiAiUser/rtdetrv2_mindspore/tools/../src/nn/backbone/presnet.py:268, 12~26\n        x = self.stem_pool(conv1)\n            ^~~~~~~~~~~~~~\n (See file '/home/HwHiAiUser/rtdetrv2_mindspore/rank_0/om/analyze_fail.ir' for more details. Get instructions about `analyze_fail.ir` at https://www.mindspore.cn/search?inputValue=analyze_fail.ir)"
+    }
+  }
+}

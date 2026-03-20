@@ -1,0 +1,20 @@
+{
+  "stream_id": 1,
+  "frame": 3,
+  "video_time": 0.12,
+  "detection_timestamp": "2026-03-16T01:58:24.790401",
+  "detections": [
+    {
+      "class_id": 0,
+      "class_name": "cable_defectueux",
+      "score": 0.9121,
+      "bbox_xyxy": [
+        12.81,
+        289.75,
+        576.5,
+        411.25
+      ],
+      "is_defect": true
+    }
+  ]
+}

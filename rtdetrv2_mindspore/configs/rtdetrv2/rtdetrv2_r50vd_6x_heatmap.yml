@@ -1,0 +1,44 @@
+__include__: [
+  '../dataset/heatmap_detection.yml',
+  '../runtime.yml',
+  './include/dataloader.yml',
+  './include/optimizer.yml',
+  './include/rtdetrv2_r50vd.yml',
+]
+
+
+output_dir: ./output/rtdetrv2_r50vd_6x_heatmap
+
+# Dataset: Heatmap fault detection (6 classes)
+# names:
+#   - Connectivity Issue - Loose Connection-Corroded
+#   - Overloaded Circuits
+#   - Faulty Circuit Breakers
+#   - Phase Imbalance
+#   - Deteriorated Insulation
+#   - Normal Operation Condition
+
+num_classes: 6
+remap_mscoco_category: False
+
+# Fine-tune from pretrained COCO weights
+tuning: /data/serverI/RT-DETR_heatmap/rtdetrv2_pytorch/weights/rtdetrv2_r50vd_6x_coco_ema.pth
+
+# Disable SyncBatchNorm for single-GPU training (sync_bn: True causes CUDA illegal memory access)
+sync_bn: False
+
+
+optimizer:
+  type: AdamW
+  params: 
+    - 
+      params: '^(?=.*backbone)(?!.*norm).*$'
+      lr: 0.00001
+    - 
+      params: '^(?=.*(?:encoder|decoder))(?=.*(?:norm|bn)).*$'
+      weight_decay: 0.
+
+  lr: 0.0001
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
