@@ -127,3 +127,70 @@ def point_distance_box(points: Tensor, distances: Tensor) -> Tensor:
     x2y2 = rb + points
     boxes = torch.concat([x1y1, x2y2], dim=-1)
     return boxes
+
+
+# -----------------------------------------------------------------------
+# Inner-IoU：面向微小目标的辅助内部边界框 IoU 损失
+# 参考：Inner-IoU: More Effective Intersection over Union Loss with
+#       Auxiliary Bounding Box (https://arxiv.org/abs/2311.02877)
+# -----------------------------------------------------------------------
+
+def _inner_box(boxes: Tensor, ratio: float) -> Tensor:
+    """以各 box 中心为锚点，按 ratio 缩放生成辅助内部边界框。
+
+    Args:
+        boxes (Tensor): [N, 4]，格式 (x1, y1, x2, y2)
+        ratio (float): 内框缩放比例，通常取 0.5~0.8；
+                       ratio=1.0 退化为原框（等价于标准 IoU）。
+    Returns:
+        inner (Tensor): [N, 4]，缩放后的内部框
+    """
+    # 中心坐标
+    cx = (boxes[:, 0] + boxes[:, 2]) * 0.5   # [N,]
+    cy = (boxes[:, 1] + boxes[:, 3]) * 0.5   # [N,]
+    # 半宽 / 半高 × ratio
+    half_w = (boxes[:, 2] - boxes[:, 0]) * 0.5 * ratio  # [N,]
+    half_h = (boxes[:, 3] - boxes[:, 1]) * 0.5 * ratio  # [N,]
+    # 组装内框
+    inner = torch.stack([
+        cx - half_w,   # x1_inner
+        cy - half_h,   # y1_inner
+        cx + half_w,   # x2_inner
+        cy + half_h,   # y2_inner
+    ], dim=-1)         # [N, 4]
+    return inner
+
+
+def elementwise_inner_iou(boxes1: Tensor, boxes2: Tensor,
+                          ratio: float = 0.7) -> Tensor:
+    # 构建辅助内部框
+    inner1 = _inner_box(boxes1, ratio)   # [N, 4]
+    inner2 = _inner_box(boxes2, ratio)   # [N, 4]
+
+    # 内部框的交集
+    lt   = torch.max(inner1[:, :2], inner2[:, :2])   # [N, 2]
+    rb   = torch.min(inner1[:, 2:], inner2[:, 2:])   # [N, 2]
+    wh   = (rb - lt).clamp(min=0)                    # [N, 2]
+    inter = wh[:, 0] * wh[:, 1]                      # [N,]
+
+    # 内部框各自面积
+    area1 = _box_area(inner1)   # [N,]
+    area2 = _box_area(inner2)   # [N,]
+    union = area1 + area2 - inter + 1e-7
+
+    inner_iou = inter / union   # [N,]
+    return inner_iou
+
+
+def inner_iou_loss(boxes1: Tensor, boxes2: Tensor,
+                   ratio: float = 0.7) -> Tensor:
+    """Inner-IoU Loss = 1 - Inner-IoU，直接用于替换 GIoU Loss 的回归项。
+
+    Args:
+        boxes1 (Tensor): [N, 4]，预测框 (x1, y1, x2, y2)
+        boxes2 (Tensor): [N, 4]，目标框 (x1, y1, x2, y2)
+        ratio  (float):  内框缩放比例，默认 0.7
+    Returns:
+        loss (Tensor): [N,]，逐样本损失值
+    """
+    return 1.0 - elementwise_inner_iou(boxes1, boxes2, ratio=ratio)

@@ -1,63 +1,64 @@
-# Java
-*.class
-*.jar
-*.war
-*.ear
-target/
-*.log
-*.iml
-.idea/
-.settings/
-.classpath
-.project
+# 大文件与媒体
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.ckpt
+*.pth
+*.pt
+*.safetensors
 
-# Node.js
-node_modules/
-dist/
+# 权重文件
+rtdetrv2_mindspore/weights/
+rtdetrv2_mindspore/rank_0/
+rtdetrv2_mindspore/kernel_meta/
+
+# 输出与缓存
+rtdetrv2_mindspore/detection_output/
+rtdetrv2_mindspore/detection_output_video*/
+rtdetrv2_mindspore/results/
+rtdetrv2_mindspore/offload/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# Environment
-.env
-.env.local
-.env.production
-.env.development
-application.properties
-application-*.properties
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # IDE
 .vscode/
-.DS_Store
+.idea/
 *.swp
 *.swo
 *~
 
-# Logs
-logs/
-*.log
-
-# Database
-*.sql.gz
-backup/
-
 # OS
-Thumbs.db
 .DS_Store
+Thumbs.db
 
-# Temporary
-tmp/
-temp/
-*.tmp
+# Node
+node_modules/
+package-lock.json
+yarn.lock
 
-# Build
+# 数据集
+dataset/
+data/
 *.zip
-*.tar.gz
-
-# Video files
-docs/*.mp4
-docs/*.avi
-docs/*.mov
-docs/*.mkv
