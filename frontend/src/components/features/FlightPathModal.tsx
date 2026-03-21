@@ -47,15 +47,6 @@ const generateRandomInspectionArea = (center: LngLat, index: number): LngLat[] =
 
 const DEFAULT_PATH: LngLat[] = generateRandomInspectionArea(WUHAN_CENTER, 0);
 
-const DEFAULT_GEOJSON = JSON.stringify(
-  {
-    type: 'Feature',
-    geometry: { type: 'Polygon', coordinates: [DEFAULT_PATH] },
-  },
-  null,
-  2
-);
-
 declare global {
   interface Window {
     AMap: any;
@@ -79,7 +70,6 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
   const isDrawingModeRef = useRef(false);
 
   const [path, setPath] = useState<LngLat[]>(DEFAULT_PATH);
-  const [geojsonText, setGeojsonText] = useState(DEFAULT_GEOJSON);
   const [startPoint, setStartPoint] = useState<LngLat>(WUHAN_CENTER);
   const [endPoint, setEndPoint] = useState<LngLat | null>(null);
   const [spacing, setSpacing] = useState(350);
@@ -343,23 +333,6 @@ export default function FlightPathModal({ droneId, onClose }: FlightPathModalPro
       }
     }
   }, [mapType]);
-
-  const applyGeojson = () => {
-    try {
-      const geojson = JSON.parse(geojsonText);
-      if (
-        geojson.type !== 'Feature' ||
-        geojson.geometry?.type !== 'Polygon' ||
-        !Array.isArray(geojson.geometry?.coordinates?.[0])
-      ) {
-        throw new Error('请使用 Feature 类型的 Polygon GeoJSON');
-      }
-      setPath(geojson.geometry.coordinates[0]);
-      mapRef.current?.setFitView();
-    } catch (e) {
-      alert('GeoJSON 解析错误：' + (e instanceof Error ? e.message : String(e)));
-    }
-  };
 
   const startSimulation = () => {
     if (isSimulating) {

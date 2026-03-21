@@ -17,7 +17,7 @@ interface UAV {
 }
 
 const UAVManagement = () => {
-  const _navigate = useNavigate();
+  useNavigate();
   const [uavs, setUavs] = useState<UAV[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUAV, setSelectedUAV] = useState<UAV | null>(null);

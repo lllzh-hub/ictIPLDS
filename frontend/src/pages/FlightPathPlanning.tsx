@@ -55,16 +55,7 @@ const DEFAULT_GEOJSON = JSON.stringify(
 
 declare global {
   interface Window {
-    AMap: {
-      Map: new (el: HTMLElement, opts?: object) => AMap.MapInstance;
-      Polygon: new (opts: object) => AMap.PolygonInstance;
-      Polyline: new (opts: object) => AMap.PolylineInstance;
-      Marker: new (opts: object) => AMap.MarkerInstance;
-      Icon: new (opts: object) => object;
-      Size: new (w: number, h: number) => object;
-      Pixel: new (x: number, y: number) => object;
-      TileLayer: { Satellite: new (opts?: object) => object };
-    };
+    AMap: any;
   }
 }
 

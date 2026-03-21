@@ -12,7 +12,7 @@ const Dashboard = () => {
     battery: 78
   });
 
-  const [schedules, setSchedules] = useState([
+  const [schedules, _setSchedules] = useState([
     { time: '14:00', title: 'Zone-A 二次巡检', location: '北区 A1-A12', status: 'running', uav: 'UAV-07' },
     { time: '15:30', title: 'Zone-B 设备检测', location: '南区 B3-B8', status: 'pending', uav: 'UAV-09' },
     { time: '17:00', title: 'Zone-C 路线规划', location: '东区 C1-C6', status: 'pending', uav: 'UAV-04' },
@@ -23,7 +23,7 @@ const Dashboard = () => {
     { time: '23:59', title: 'Zone-D 日终总结', location: '西区 D1-D10', status: 'pending', uav: 'UAV-06' },
   ]);
 
-  const [activities, setActivities] = useState([
+  const [activities, _setActivities] = useState([
     { icon: 'alert-triangle', title: '检测到绝缘子破损', meta: 'UAV-12 · Zone-A · 塔架 A-07', time: '14:28', alert: true },
     { icon: 'check-circle', title: '完成塔架巡检', meta: 'UAV-07 · Zone-A · 塔架 A-12', time: '14:25', alert: false },
     { icon: 'battery', title: 'UAV-05 电量低于20%', meta: '返回充电站中...', time: '14:22', alert: false },
@@ -51,8 +51,8 @@ const Dashboard = () => {
     document.body.appendChild(script);
     
     script.onload = () => {
-      if (window.lucide) {
-        window.lucide.createIcons();
+      if ((window as any).lucide) {
+        (window as any).lucide.createIcons();
       }
     };
 

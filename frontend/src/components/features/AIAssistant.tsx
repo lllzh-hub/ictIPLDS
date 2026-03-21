@@ -117,7 +117,7 @@ const AIAssistant = () => {
 
     try {
       const response = await aiApi.analyzeDefect(userMessage);
-      setMessages(prev => [...prev, { id: String(messageIdCounter.current++), role: 'assistant', content: response }]);
+      setMessages(prev => [...prev, { id: String(messageIdCounter.current++), role: 'assistant', content: String(response) }]);
     } catch (error: any) {
       console.error('AI分析失败:', error);
       let errorMessage = '抱歉，AI分析服务暂时不可用。\n\n';
