@@ -72,9 +72,22 @@ public class AIController {
                             }
                         }
 
-                        // 构建 taskInfo
+                        // 构建 taskInfo，并根据置信度决定是否插入 [HIGH_CONFIDENCE] 标记
                         if (taskInfo == null || taskInfo.isBlank()) {
                             StringBuilder sb = new StringBuilder();
+                            // 置信度 >= 85% 时插入标记，AI 将跳过误判分析
+                            boolean highConfidence = defect.getConfidence() != null
+                                    && defect.getConfidence() >= 0.85;
+                            if (highConfidence) {
+                                sb.append("[HIGH_CONFIDENCE]\n");
+                                logger.info("置信度 {}% >= 85%，标记为高置信度，跳过误判分析",
+                                        String.format("%.1f", defect.getConfidence() * 100));
+                            } else {
+                                logger.info("置信度 {} < 85% 或未知，启用误判分析",
+                                        defect.getConfidence() != null
+                                                ? String.format("%.1f%%", defect.getConfidence() * 100)
+                                                : "未知");
+                            }
                             sb.append("检测模型识别结果：\n");
                             sb.append("缺陷类型: ").append(defect.getType()).append("\n");
                             sb.append("位置: ").append(defect.getLocation()).append("\n");
@@ -88,7 +101,11 @@ public class AIController {
                             if (defect.getSolution() != null) {
                                 sb.append("红外检测框: ").append(defect.getSolution()).append("\n");
                             }
-                            sb.append("\n请结合上方图片，独立判断是否存在真实缺陷，并给出完整分析。");
+                            if (highConfidence) {
+                                sb.append("\n请结合上方图片，对该缺陷给出完整的专业分析。");
+                            } else {
+                                sb.append("\n请结合上方图片，独立判断是否存在真实缺陷，并给出完整分析。");
+                            }
                             taskInfo = sb.toString();
                         }
                     }
@@ -122,11 +139,13 @@ public class AIController {
                 solution = parts.length > 1 ? parts[1].trim() : "";
             }
 
-            boolean isFalsePositive = detectFalsePositive(analysis);
+            // 高置信度时直接确认为真实缺陷，不做误判判断
+            boolean highConfidence = taskInfo != null && taskInfo.contains("[HIGH_CONFIDENCE]");
+            boolean isFalsePositive = highConfidence ? false : detectFalsePositive(analysis);
             analysis = analysis.replaceAll("(?m)^\\[VERDICT:(FALSE_POSITIVE|DEFECT_CONFIRMED)\\]\\s*\n?", "").trim();
-            logger.info("AI分析成功完成，误判={}", isFalsePositive);
+            logger.info("AI分析成功完成，高置信度={}, 误判={}", highConfidence, isFalsePositive);
 
-            // 无论是否误判，都将清理后的 analysis/solution 持久化到数据库
+            // 持久化 analysis/solution 及元数据到数据库
             if (defectIdObj != null) {
                 try {
                     Long defectId = Long.parseLong(defectIdObj.toString());
@@ -135,14 +154,15 @@ public class AIController {
                         Defect defect = defectOpt.get();
                         defect.setAiTextAnalysis(analysis);
                         defect.setAiTextSolution(solution);
-                        if (isFalsePositive) {
-                            defect.setIsFalsePositive(true);
-                        }
+                        defect.setIsFalsePositive(isFalsePositive);
                         if (metaExtract.misdetectionType != null && !metaExtract.misdetectionType.isBlank()) {
                             defect.setMisdetectionType(metaExtract.misdetectionType);
                         }
                         if (metaExtract.severityTimelineJson != null && !metaExtract.severityTimelineJson.isBlank()) {
                             defect.setSeverityTimeline(metaExtract.severityTimelineJson);
+                        }
+                        if (metaExtract.suggestedDeadline != null && !metaExtract.suggestedDeadline.isBlank()) {
+                            defect.setSuggestedDeadline(metaExtract.suggestedDeadline);
                         }
                         defectService.updateDefect(defectId, defect);
                         logger.info("已持久化AI分析结果到缺陷 {}，误判={}", defectId, isFalsePositive);
@@ -156,8 +176,10 @@ public class AIController {
             result.put("analysis", analysis);
             result.put("solution", solution);
             result.put("isFalsePositive", isFalsePositive);
+            result.put("highConfidence", highConfidence);
             result.put("misdetectionType", metaExtract.misdetectionType);
             result.put("severityTimeline", metaExtract.severityTimelineJson);
+            result.put("suggestedDeadline", metaExtract.suggestedDeadline);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             logger.error("AI分析失败: {}", e.getMessage(), e);
@@ -200,44 +222,53 @@ public class AIController {
         final String cleanedText;
         final String misdetectionType;
         final String severityTimelineJson;
+        final String suggestedDeadline;
 
-        MetaExtract(String cleanedText, String misdetectionType, String severityTimelineJson) {
+        MetaExtract(String cleanedText, String misdetectionType, String severityTimelineJson, String suggestedDeadline) {
             this.cleanedText = cleanedText;
             this.misdetectionType = misdetectionType;
             this.severityTimelineJson = severityTimelineJson;
+            this.suggestedDeadline = suggestedDeadline;
         }
     }
 
     /**
      * 从千问输出中提取 ---META_JSON--- 后的 JSON，并从原文移除该段，避免影响前端展示。
-     * 这里不做完整JSON解析（避免引入额外依赖），只做字段的轻量提取与trend数组原样保存。
      */
     private MetaExtract extractMetaJson(String text) {
-        if (text == null) return new MetaExtract("", null, null);
+        if (text == null) return new MetaExtract("", null, null, null);
 
         int idx = text.indexOf("---META_JSON---");
-        if (idx < 0) return new MetaExtract(text, null, null);
+        if (idx < 0) return new MetaExtract(text, null, null, null);
 
         String before = text.substring(0, idx).trim();
         String after = text.substring(idx + "---META_JSON---".length()).trim();
 
-        // 尝试截取一个JSON对象（从第一个 { 到最后一个 }）
+        // 截取 JSON 对象（从第一个 { 到最后一个 }）
         int l = after.indexOf('{');
         int r = after.lastIndexOf('}');
         if (l < 0 || r < 0 || r <= l) {
-            return new MetaExtract(before, null, null);
+            return new MetaExtract(before, null, null, null);
         }
 
         String json = after.substring(l, r + 1);
 
         String misdetectionType = null;
         String trendJson = null;
+        String suggestedDeadline = null;
 
         try {
             Pattern pType = Pattern.compile("\"misdetectionType\"\\s*:\\s*\"([^\"]+)\"");
             Matcher mType = pType.matcher(json);
             if (mType.find()) {
                 misdetectionType = mType.group(1);
+            }
+
+            // 提取 suggestedDeadline
+            Pattern pDeadline = Pattern.compile("\"suggestedDeadline\"\\s*:\\s*\"([^\"]+)\"");
+            Matcher mDeadline = pDeadline.matcher(json);
+            if (mDeadline.find()) {
+                suggestedDeadline = mDeadline.group(1);
             }
 
             // 提取 trend 数组原样（保存为 JSON 字符串）
@@ -250,6 +281,6 @@ public class AIController {
             logger.warn("解析 META_JSON 失败: {}", e.getMessage());
         }
 
-        return new MetaExtract(before, misdetectionType, trendJson);
+        return new MetaExtract(before, misdetectionType, trendJson, suggestedDeadline);
     }
 }

@@ -585,7 +585,7 @@ body {
 
 .emergency-title {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.3rem;
   letter-spacing: 0.08em;
   color: var(--color-danger);
   text-transform: uppercase;
@@ -617,7 +617,7 @@ body {
   justify-content: space-between;
   padding: 0.5rem 0;
   border-bottom: 1px solid rgba(239, 68, 68, 0.4);
-  font-size: 0.7rem;
+  font-size: 0.9rem;
 }
 
 .emergency-row:last-child {
@@ -647,7 +647,7 @@ body {
 .btn {
   flex: 1;
   padding: 0.6rem;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
   border: none;

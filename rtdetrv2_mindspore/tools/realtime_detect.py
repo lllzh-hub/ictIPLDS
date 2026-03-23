@@ -666,23 +666,354 @@ def run_detection_multiprocess(args):
 
 
 # =======================================================================
+# 双缓冲帧同步检测模式
+# 原理：两路视频流各用一个线程持续向共享缓冲区写入最新帧（只保留最新1帧），
+#       推理线程每次同时从缓冲区取两路最新帧进行推理，天然实现时间对齐，
+#       同时避免队列积压、缓解输入压力。
+# =======================================================================
+import threading
+
+class LatestFrameBuffer:
+    """
+    单帧双通道缓冲区。
+    两路视频流线程各自调用 put(channel, frame) 写入最新帧；
+    推理线程调用 get_pair() 同时获取两路最新帧（若任一路尚无帧则返回 None）。
+    内部使用 RLock 保证线程安全，写入操作直接覆盖旧帧，永远只保存最新一帧。
+    """
+    def __init__(self):
+        self._lock = threading.RLock()
+        self._frames = {1: None, 2: None}   # channel -> (frame_idx, timestamp, frame_bgr)
+
+    def put(self, channel: int, frame_idx: int, timestamp: float, frame_bgr):
+        """视频流线程调用：写入最新帧，直接覆盖旧帧"""
+        with self._lock:
+            self._frames[channel] = (frame_idx, timestamp, frame_bgr.copy())
+
+    def get_pair(self):
+        """
+        推理线程调用：同时取出两路最新帧。
+        返回 ((idx1, ts1, frame1), (idx2, ts2, frame2)) 或 None（任一路尚无帧）。
+        注意：此操作不清除缓冲区，推理线程可反复调用；
+              重复取到相同帧时由调用方通过 frame_idx 去重。
+        """
+        with self._lock:
+            f1 = self._frames[1]
+            f2 = self._frames[2]
+        if f1 is None or f2 is None:
+            return None
+        return f1, f2
+
+
+def _stream_reader(channel: int, video_path: str,
+                   buffer: LatestFrameBuffer, stop_event: threading.Event,
+                   fps_ref: list):
+    """
+    视频流读取线程：以原始帧率持续读取视频帧，
+    每读到一帧就写入 LatestFrameBuffer（直接覆盖）。
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f'[Buffer][流{channel}] 无法打开视频: {video_path}')
+        stop_event.set()
+        return
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    fps_ref[0] = fps          # 回传 fps 供主线程使用
+    frame_idx = 0
+    interval = 1.0 / fps      # 模拟真实帧率节奏（离线视频场景）
+
+    print(f'[Buffer][流{channel}] 已打开: {video_path}  FPS={fps:.1f}')
+
+    while not stop_event.is_set():
+        t_read = time.time()
+        ret, frame = cap.read()
+        if not ret:
+            print(f'[Buffer][流{channel}] 视频读取完毕')
+            break
+        frame_idx += 1
+        timestamp = frame_idx / fps
+        buffer.put(channel, frame_idx, timestamp, frame)
+
+        # 控制读取节奏，避免瞬间把视频全部读完撑满内存
+        elapsed = time.time() - t_read
+        sleep_t = interval - elapsed
+        if sleep_t > 0:
+            time.sleep(sleep_t)
+
+    cap.release()
+    # 通知主线程该路流已结束
+    stop_event.set()
+
+
+def run_detection_dualbuffer(args):
+    """
+    双缓冲帧同步检测模式主函数。
+    - 两个读取线程分别将两路视频的最新帧写入 LatestFrameBuffer
+    - 主线程（推理线程）循环调用 get_pair() 同时取两路帧推理
+    - 通过记录上次推理的 frame_idx 避免重复推理同一帧对
+    """
+    global CLASS_NAMES, DEFECT_CLASS_IDS
+
+    # ---- 解析类别 ----
+    num_cls = args.num_classes
+    if num_cls is None:
+        try:
+            from src.core import YAMLConfig
+            cfg_tmp = YAMLConfig(args.config)
+            num_cls = int(getattr(cfg_tmp, 'num_classes',
+                          getattr(cfg_tmp.postprocessor, 'num_classes', 8)))
+        except Exception:
+            num_cls = 8
+    CLASS_NAMES, DEFECT_CLASS_IDS = resolve_class_names(num_cls)
+    print(f'[DualBuffer] num_classes={num_cls}, names={CLASS_NAMES}')
+
+    # ---- 初始化推理后端（在主进程/线程中加载，避免多进程权重重复加载） ----
+    backend_name = args.backend.lower()
+    if backend_name == 'onnx':
+        if not args.onnx_file:
+            raise ValueError('ONNX 后端需要指定 --onnx-file')
+        backend1 = ONNXBackend(args.onnx_file)
+        # 双路可共享同一 ONNX session（onnxruntime 线程安全）
+        backend2 = backend1
+    elif backend_name == 'mindspore':
+        if not args.resume:
+            raise ValueError('MindSpore 后端需要指定 -r / --resume')
+        backend1 = MindSporeBackend(args.config, args.resume, device=args.device)
+        # 第二路若有独立配置则单独加载，否则复用
+        cfg2  = getattr(args, 'config_2',  None) or args.config
+        ckpt2 = getattr(args, 'resume_2',  None) or args.resume
+        if cfg2 == args.config and ckpt2 == args.resume:
+            backend2 = backend1   # 同一模型，直接复用（MindSpore Cell 无状态推理安全）
+        else:
+            backend2 = MindSporeBackend(cfg2, ckpt2, device=args.device)
+    else:
+        raise ValueError(f'Unknown backend: {args.backend}')
+
+    # ---- 输出目录 ----
+    out_dir   = args.output_dir
+    os.makedirs(out_dir, exist_ok=True)
+    ts_str    = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    json_path = os.path.join(out_dir, f'dualbuffer_results_{ts_str}.json')
+
+    print('=' * 70)
+    print('双缓冲帧同步模式')
+    print(f'  视频1 (可见光): {args.video_path}')
+    print(f'  视频2 (红外):   {getattr(args, "video_path_2", "未指定")}')
+    print(f'  输出目录:       {out_dir}')
+    print(f'  阈值:           {args.threshold}')
+    print('=' * 70)
+
+    # ---- 构建共享缓冲区 ----
+    buffer     = LatestFrameBuffer()
+    stop_event = threading.Event()
+    fps_ref1   = [25.0]   # 用列表传引用
+    fps_ref2   = [25.0]
+
+    video_path_2 = getattr(args, 'video_path_2', None) or args.video_path
+
+    t1 = threading.Thread(
+        target=_stream_reader,
+        args=(1, args.video_path, buffer, stop_event, fps_ref1),
+        daemon=True, name='StreamReader-1'
+    )
+    t2 = threading.Thread(
+        target=_stream_reader,
+        args=(2, video_path_2, buffer, stop_event, fps_ref2),
+        daemon=True, name='StreamReader-2'
+    )
+
+    t1.start()
+    t2.start()
+
+    # 等待两路流各自至少写入一帧后再开始推理
+    print('[DualBuffer] 等待两路流就绪...')
+    while not stop_event.is_set():
+        if buffer.get_pair() is not None:
+            break
+        time.sleep(0.02)
+    print('[DualBuffer] 缓冲区就绪，开始推理\n')
+
+    # ---- 推理主循环 ----
+    all_results   = []
+    infer_idx     = 0
+    defect_count  = 0
+    last_pair_ids = (-1, -1)   # 记录上次推理的 (idx1, idx2)，用于去重
+
+    try:
+        while not stop_event.is_set():
+            pair = buffer.get_pair()
+            if pair is None:
+                time.sleep(0.005)
+                continue
+
+            (idx1, ts1, frame1), (idx2, ts2, frame2) = pair
+
+            # 去重：若两路帧号与上次完全相同，说明缓冲区尚未更新，跳过
+            if (idx1, idx2) == last_pair_ids:
+                time.sleep(0.005)
+                continue
+            last_pair_ids = (idx1, idx2)
+
+            infer_idx += 1
+            t0 = time.time()
+
+            # 对两路帧分别推理
+            labels1, boxes1, scores1 = backend1.infer(frame1)
+            labels2, boxes2, scores2 = backend2.infer(frame2)
+
+            infer_fps = 1.0 / max(time.time() - t0, 1e-6)
+
+            # ---- 过滤 & 整理检测结果 ----
+            def _filter(labels_np, boxes_np, scores_np):
+                mask = scores_np > args.threshold
+                dets = []
+                for lbl, box, scr in zip(labels_np[mask], boxes_np[mask], scores_np[mask]):
+                    lbl_int = int(lbl)
+                    dets.append({
+                        'class_id':   lbl_int,
+                        'class_name': CLASS_NAMES[lbl_int] if lbl_int < len(CLASS_NAMES) else f'cls{lbl_int}',
+                        'score':      round(float(scr), 4),
+                        'bbox_xyxy':  [round(float(v), 2) for v in box],
+                        'is_defect':  lbl_int in DEFECT_CLASS_IDS,
+                    })
+                return dets
+
+            dets1 = _filter(labels1, boxes1, scores1)
+            dets2 = _filter(labels2, boxes2, scores2)
+
+            has_defect1 = any(d['is_defect'] for d in dets1)
+            has_defect2 = any(d['is_defect'] for d in dets2)
+            has_defect  = has_defect1 or has_defect2
+
+            frame_result = {
+                'infer_index': infer_idx,
+                'stream1': {'frame_idx': idx1, 'timestamp_sec': round(ts1, 4),
+                            'has_defect': has_defect1, 'detections': dets1},
+                'stream2': {'frame_idx': idx2, 'timestamp_sec': round(ts2, 4),
+                            'has_defect': has_defect2, 'detections': dets2},
+            }
+
+            if has_defect:
+                defect_count += 1
+                all_results.append(frame_result)
+
+                # 使用 stream1 视频时间戳命名目录，与多进程模式保持一致
+                # 格式：timestamp_X_XXX（小数点替换为下划线）
+                timestamp_str = f'{ts1:.3f}'.replace('.', '_')
+                ev_dir = os.path.join(out_dir, f'timestamp_{timestamp_str}')
+                os.makedirs(ev_dir, exist_ok=True)
+
+                # stream1：原始帧（命名与多进程模式一致）
+                cv2.imwrite(os.path.join(ev_dir, f'stream1_frame_{idx1}.jpg'), frame1)
+
+                # stream1：检测结果 JSON
+                detection_data1 = {
+                    'stream_id': 1,
+                    'frame': idx1,
+                    'video_time': round(ts1, 4),
+                    'detection_timestamp': datetime.datetime.now().isoformat(),
+                    'detections': dets1,
+                }
+                with open(os.path.join(ev_dir, 'stream1_detections.json'), 'w', encoding='utf-8') as jf:
+                    json.dump(detection_data1, jf, ensure_ascii=False, indent=2)
+
+                # stream2：原始帧
+                cv2.imwrite(os.path.join(ev_dir, f'stream2_frame_{idx2}.jpg'), frame2)
+
+                # stream2：检测结果 JSON
+                detection_data2 = {
+                    'stream_id': 2,
+                    'frame': idx2,
+                    'video_time': round(ts2, 4),
+                    'detection_timestamp': datetime.datetime.now().isoformat(),
+                    'detections': dets2,
+                }
+                with open(os.path.join(ev_dir, 'stream2_detections.json'), 'w', encoding='utf-8') as jf:
+                    json.dump(detection_data2, jf, ensure_ascii=False, indent=2)
+
+                frame_result['saved_dir'] = ev_dir
+
+                print(f'[推理#{infer_idx:5d}] '
+                      f'S1帧{idx1}({ts1:.2f}s) S2帧{idx2}({ts2:.2f}s) '
+                      f'缺陷[{"1" if has_defect1 else "-"}{"2" if has_defect2 else "-"}] '
+                      f'fps={infer_fps:.1f} -> {ev_dir}')
+            else:
+                if infer_idx % 100 == 0:
+                    print(f'[推理#{infer_idx:5d}] '
+                          f'S1帧{idx1}({ts1:.2f}s) S2帧{idx2}({ts2:.2f}s) '
+                          f'无缺陷  fps={infer_fps:.1f}')
+
+            # 可选实时预览
+            if not args.no_display:
+                ann1 = draw_boxes_cv2(frame1, labels1, boxes1, scores1, args.threshold)
+                ann2 = draw_boxes_cv2(frame2, labels2, boxes2, scores2, args.threshold)
+                cv2.putText(ann1, f'Stream1 FPS:{infer_fps:.1f}',
+                            (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                cv2.putText(ann2, f'Stream2 FPS:{infer_fps:.1f}',
+                            (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                cv2.imshow('DualBuffer - Stream1 (Visible)', ann1)
+                cv2.imshow('DualBuffer - Stream2 (IR)', ann2)
+                key = cv2.waitKey(1) & 0xFF
+                if key in (ord('q'), 27):
+                    print('\n[DualBuffer] 用户中断')
+                    break
+
+    except KeyboardInterrupt:
+        print('\n[DualBuffer] 用户中断')
+    finally:
+        stop_event.set()
+        t1.join(timeout=3)
+        t2.join(timeout=3)
+        if not args.no_display:
+            cv2.destroyAllWindows()
+
+    # ---- 写汇总 JSON ----
+    summary = {
+        'mode':                  'dual_buffer',
+        'video1':                args.video_path,
+        'video2':                video_path_2,
+        'backend':               backend_name,
+        'threshold':             args.threshold,
+        'total_infer_pairs':     infer_idx,
+        'defect_pair_count':     defect_count,
+        'class_names':           CLASS_NAMES,
+        'defect_class_ids':      sorted(DEFECT_CLASS_IDS),
+        'created_at':            datetime.datetime.now().isoformat(),
+        'frames':                all_results,
+    }
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+
+    print(f'\n======== 双缓冲检测完成 ========')
+    print(f'推理帧对总数 : {infer_idx}')
+    print(f'缺陷帧对数   : {defect_count}')
+    print(f'JSON 结果    : {json_path}')
+    print(f'缺陷截图目录 : {frames_dir}')
+    print(f'=================================')
+
+
+# =======================================================================
 # 主检测循环
 # =======================================================================
 def run_detection(args):
     global CLASS_NAMES, DEFECT_CLASS_IDS
 
+    # ---- 优先判断双缓冲模式 ----
+    use_dualbuffer = getattr(args, 'dual_buffer', False)
+    if use_dualbuffer:
+        run_detection_dualbuffer(args)
+        return
+
     # ---- 检查是否为多进程模式 ----
-    # 只需 --video-path-2 + --shared-dir 即可触发多进程模式，--stream-id 可选
     use_multiprocess = (args.shared_dir is not None and
                         hasattr(args, 'video_path_2') and args.video_path_2 is not None)
-    
     if use_multiprocess:
         print('=' * 70)
         print('多进程模式：处理两个视频文件')
         print('=' * 70)
         run_detection_multiprocess(args)
         return
-    
+
     # ---- 原有的单进程模式 ----
     print('=' * 70)
     print('单进程模式：处理单个视频文件')
@@ -1022,6 +1353,14 @@ def parse_args():
     parser.add_argument('-w', '--time-window', type=float, default=0.5,
                         dest='time_window',
                         help='同时检测时间窗口（秒），默认 0.5')
+    parser.add_argument('--dual-buffer',   action='store_true',
+                        dest='dual_buffer',
+                        help=(
+                            '启用双缓冲帧同步模式：两路视频流各用独立线程持续写入\n'
+                            '共享缓冲区（每路只保留最新1帧），推理线程每次同时取\n'
+                            '两路最新帧推理，实现低延迟时间对齐并缓解输入压力。\n'
+                            '需同时指定 --video-path（可见光）和 --video-path-2（红外）。'
+                        ))
     return parser.parse_args()
 
 

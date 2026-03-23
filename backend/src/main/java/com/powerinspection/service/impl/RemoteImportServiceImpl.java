@@ -103,21 +103,20 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                     // 创建缺陷记录
                     Defect defect = new Defect();
                     
-                    // 从 detections 数组中提取第一个检测结果
+                    // 从 detections 数组中提取置信度最高的检测结果作为主要缺陷类型
                     String type = "检测缺陷_" + folderName;
                     Double confidence = 0.0;
                     
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> detections = (List<Map<String, Object>>) stream1Data.get("detections");
                     if (detections != null && !detections.isEmpty()) {
-                        Map<String, Object> firstDetection = detections.get(0);
-                        Object className = firstDetection.get("class_name");
-                        if (className != null) {
-                            type = className.toString();
-                        }
-                        Object score = firstDetection.get("score");
-                        if (score != null && score instanceof Number) {
-                            confidence = ((Number) score).doubleValue();
+                        for (Map<String, Object> det : detections) {
+                            Object sc = det.get("score");
+                            if (sc instanceof Number && ((Number) sc).doubleValue() > confidence) {
+                                confidence = ((Number) sc).doubleValue();
+                                Object cn = det.get("class_name");
+                                if (cn != null) type = cn.toString();
+                            }
                         }
                     }
                     
@@ -177,14 +176,9 @@ public class RemoteImportServiceImpl implements RemoteImportService {
 
                     // 自动生成 AI 分析和解决方案（传入图片做多模态分析）
                     try {
-                        // 判断是否有真实缺陷
+                        // 判断是否有真实缺陷（信任 Python 已按低阈值过滤，直接判断 is_defect 字段）
                         boolean hasDefect = detections != null && !detections.isEmpty() &&
-                            detections.stream().anyMatch(d -> {
-                                Object isDefect = d.get("is_defect");
-                                Object score = d.get("score");
-                                return (isDefect == null || Boolean.TRUE.equals(isDefect)) &&
-                                       (score == null || ((Number) score).doubleValue() >= 0.3);
-                            });
+                            detections.stream().anyMatch(d -> Boolean.TRUE.equals(d.get("is_defect")));
 
                         String taskInfo;
                         if (!hasDefect) {
@@ -192,7 +186,17 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                                 "检测位置: " + defect.getLocation() + "\n" +
                                 "检测结果: " + objectMapper.writeValueAsString(detections != null ? detections : List.of());
                         } else {
+                            // 置信度 >= 85% 使用高置信度 prompt，跳过误判判断
+                            boolean highConfidence = defect.getConfidence() != null && defect.getConfidence() >= 0.85;
                             StringBuilder sb = new StringBuilder();
+                            if (highConfidence) {
+                                sb.append("[HIGH_CONFIDENCE]\n");
+                                log.info("置信度 {}% >= 85%，使用高置信度 prompt",
+                                        String.format("%.1f", defect.getConfidence() * 100));
+                            } else {
+                                log.info("置信度 {}% < 85%，使用低置信度 prompt（含误判判断）",
+                                        String.format("%.1f", defect.getConfidence() * 100));
+                            }
                             sb.append("检测模型识别结果：\n");
                             sb.append("缺陷类型: ").append(defect.getType()).append("\n");
                             sb.append("位置: ").append(defect.getLocation()).append("\n");
@@ -203,7 +207,11 @@ public class RemoteImportServiceImpl implements RemoteImportService {
                             if (defect.getSolution() != null) {
                                 sb.append("红外图检测框(stream2): ").append(defect.getSolution()).append("\n");
                             }
-                            sb.append("\n请结合上方图片，独立判断是否存在真实缺陷，并给出完整分析。");
+                            if (highConfidence) {
+                                sb.append("\n请结合上方图片，对该缺陷给出完整的专业分析。");
+                            } else {
+                                sb.append("\n请结合上方图片，独立判断是否存在真实缺陷，并给出完整分析。");
+                            }
                             taskInfo = sb.toString();
                         }
 
@@ -239,9 +247,7 @@ public class RemoteImportServiceImpl implements RemoteImportService {
 
                         defect.setAiTextAnalysis(analysis);
                         defect.setAiTextSolution(solution);
-                        if (isFalsePositive) {
-                            defect.setIsFalsePositive(true);
-                        }
+                        defect.setIsFalsePositive(isFalsePositive);
                         // 解析 META_JSON（误检类型 & 趋势发展节点）
                         extractAndSetMeta(defect, fullAnalysis);
                         log.info("AI 多模态分析生成成功，误判={}", isFalsePositive);
