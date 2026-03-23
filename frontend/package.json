@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@iconify-json/material-symbols": "^1.2.63",
+    "@iconify-json/mdi": "^1.2.3",
     "@iconify/react": "^6.0.2",
     "axios": "^1.13.6",
     "echarts": "^6.0.0",

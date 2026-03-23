@@ -41,17 +41,21 @@ const LiveMonitor = () => {
       if (!response.ok) throw new Error('获取无人机列表失败');
       const data = await response.json();
       
-      const formattedData = data.map((drone: any) => ({
-        id: drone.id,
-        uavId: drone.droneId,
-        name: drone.name,
-        status: drone.status?.toLowerCase() === 'in_flight' ? 'working' : 'standby',
-        battery: Math.round(drone.batteryLevel) || 0,
-        speed: 0,
-        latitude: drone.latitude || 0,
-        longitude: drone.longitude || 0,
-        altitude: 0
-      }));
+      const formattedData = data.map((drone: any) => {
+        const isWorking = drone.status?.toLowerCase() === 'in_flight';
+        return {
+          id: drone.id,
+          uavId: drone.droneId,
+          name: drone.name,
+          status: isWorking ? 'working' : 'standby',
+          battery: Math.round(drone.batteryLevel) || 0,
+          // working 状态随机初始化飞行参数区间
+          speed: isWorking ? Math.round(30 + Math.random() * 35) : 0,
+          latitude: drone.latitude || 0,
+          longitude: drone.longitude || 0,
+          altitude: isWorking ? Math.round(80 + Math.random() * 70) : 0,
+        };
+      });
       
       setUavList(formattedData);
       if (formattedData.length > 0) {
@@ -92,6 +96,29 @@ const LiveMonitor = () => {
       // 不抛出错误，继续使用默认视频
     }
   };
+
+  // 动态更新 working 状态无人机的高度和速度
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUavList(prev => prev.map(uav => {
+        if (uav.status !== 'working') return uav;
+        // 高度在 [80, 150]m 区间波动 ±3m
+        const newAltitude = Math.min(150, Math.max(80,
+          uav.altitude + (Math.random() - 0.5) * 6
+        ));
+        // 速度在 [30, 65]km/h 区间波动 ±2km/h
+        const newSpeed = Math.min(65, Math.max(30,
+          uav.speed + (Math.random() - 0.5) * 4
+        ));
+        return {
+          ...uav,
+          altitude: Math.round(newAltitude),
+          speed: Math.round(newSpeed),
+        };
+      }));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 获取视频源 - 通用接口
   const getVideoSource = (uavId: string): { url: string | null; type: 'live' | 'file' | 'none' } => {

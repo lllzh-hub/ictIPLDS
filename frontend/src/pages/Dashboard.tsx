@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LiveMonitor from '../components/features/LiveMonitor';
+import Icon from '../components/common/Icon';
 import '../styles/dashboard.css';
 
 const Dashboard = () => {
@@ -24,38 +25,28 @@ const Dashboard = () => {
   ]);
 
   const [activities, _setActivities] = useState([
-    { icon: 'alert-triangle', title: '检测到绝缘子破损', meta: 'UAV-12 · Zone-A · 塔架 A-07', time: '14:28', alert: true },
-    { icon: 'check-circle', title: '完成塔架巡检', meta: 'UAV-07 · Zone-A · 塔架 A-12', time: '14:25', alert: false },
-    { icon: 'battery', title: 'UAV-05 电量低于20%', meta: '返回充电站中...', time: '14:22', alert: false },
-    { icon: 'play', title: '启动 Zone-B 巡检', meta: 'UAV-09 · 准备起飞', time: '14:20', alert: false },
-    { icon: 'check-circle', title: '完成航点拍摄', meta: 'UAV-03 · Zone-A · 航点 15', time: '14:18', alert: false },
-    { icon: 'camera', title: '采集高清图像', meta: 'UAV-08 · Zone-C · 设备 C-04', time: '14:15', alert: false },
-    { icon: 'zap', title: '检测到异常温度', meta: 'UAV-11 · Zone-B · 变压器 B-02', time: '14:12', alert: true },
-    { icon: 'check-circle', title: '完成区域扫描', meta: 'UAV-04 · Zone-A · 完成度 100%', time: '14:10', alert: false },
-    { icon: 'wifi', title: '信号强度下降', meta: 'UAV-06 · 距离基站 2.5km', time: '14:08', alert: false },
-    { icon: 'play', title: '启动自动巡检', meta: 'UAV-02 · Zone-D · 预计耗时 45min', time: '14:05', alert: false },
-    { icon: 'check-circle', title: '完成数据上传', meta: '本次巡检 · 共 2847 张图像', time: '14:02', alert: false },
-    { icon: 'alert-circle', title: '检测到异物', meta: 'UAV-10 · Zone-A · 塔架 A-15', time: '13:58', alert: true },
+    { icon: 'heroicons:exclamation-triangle', title: '检测到绝缘子破损', meta: 'UAV-12 · Zone-A · 塔架 A-07', time: '14:28', alert: true },
+    { icon: 'heroicons:check-circle', title: '完成塔架巡检', meta: 'UAV-07 · Zone-A · 塔架 A-12', time: '14:25', alert: false },
+    { icon: 'heroicons:battery-100', title: 'UAV-05 电量低于20%', meta: '返回充电站中...', time: '14:22', alert: false },
+    { icon: 'heroicons:play', title: '启动 Zone-B 巡检', meta: 'UAV-09 · 准备起飞', time: '14:20', alert: false },
+    { icon: 'heroicons:check-circle', title: '完成航点拍摄', meta: 'UAV-03 · Zone-A · 航点 15', time: '14:18', alert: false },
+    { icon: 'heroicons:camera', title: '采集高清图像', meta: 'UAV-08 · Zone-C · 设备 C-04', time: '14:15', alert: false },
+    { icon: 'heroicons:bolt', title: '检测到异常温度', meta: 'UAV-11 · Zone-B · 变压器 B-02', time: '14:12', alert: true },
+    { icon: 'heroicons:check-circle', title: '完成区域扫描', meta: 'UAV-04 · Zone-A · 完成度 100%', time: '14:10', alert: false },
+    { icon: 'heroicons:wifi', title: '信号强度下降', meta: 'UAV-06 · 距离基站 2.5km', time: '14:08', alert: false },
+    { icon: 'heroicons:play', title: '启动自动巡检', meta: 'UAV-02 · Zone-D · 预计耗时 45min', time: '14:05', alert: false },
+    { icon: 'heroicons:check-circle', title: '完成数据上传', meta: '本次巡检 · 共 2847 张图像', time: '14:02', alert: false },
+    { icon: 'heroicons:exclamation-circle', title: '检测到异物', meta: 'UAV-10 · Zone-A · 塔架 A-15', time: '13:58', alert: true },
   ]);
 
   const quickAccessItems = [
-    { icon: 'alert-triangle', title: '缺陷管理', desc: '查看系统缺陷', path: '/defect-management' },
-    { icon: 'plane', title: '无人机管理', desc: '管理无人机队伍', path: '/uav-management' },
-    { icon: 'map', title: '航线规划', desc: '规划巡检路线', path: '/flight-path' },
-    { icon: 'file-text', title: '态势感知', desc: '查看系统概览', path: '/' },
+    { icon: 'heroicons:exclamation-triangle', title: '缺陷管理', desc: '查看系统缺陷', path: '/defect-management' },
+    { icon: 'mdi:quadcopter', title: '无人机管理', desc: '管理无人机队伍', path: '/uav-management' },
+    { icon: 'heroicons:map', title: '航线规划', desc: '规划巡检路线', path: '/flight-path' },
+    { icon: 'heroicons:document-text', title: '态势感知', desc: '查看系统概览', path: '/' },
   ];
 
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/lucide@latest';
-    document.body.appendChild(script);
-    
-    script.onload = () => {
-      if ((window as any).lucide) {
-        (window as any).lucide.createIcons();
-      }
-    };
-
     const interval = setInterval(() => {
       setStats(prev => ({
         ...prev,
@@ -65,7 +56,6 @@ const Dashboard = () => {
       }));
     }, 5000);
 
-    // 自动滚动日志
     const scrollInterval = setInterval(() => {
       const activityList = document.querySelector('.activity-list');
       if (activityList) {
@@ -76,7 +66,6 @@ const Dashboard = () => {
       }
     }, 50);
 
-    // 自动滚动巡检计划
     const scheduleScrollInterval = setInterval(() => {
       const scheduleList = document.querySelector('.schedule-list');
       if (scheduleList) {
@@ -105,7 +94,7 @@ const Dashboard = () => {
         <div className="stat-card">
           <div className="stat-card-header">
             <div className="stat-card-icon">
-              <i data-lucide="map-pin" style={{width: '24px', height: '24px'}}></i>
+              <Icon icon="heroicons:map-pin" style={{width: '24px', height: '24px', color: 'var(--color-blue)'}} />
             </div>
             <div className="stat-card-trend up">+12%</div>
           </div>
@@ -116,7 +105,7 @@ const Dashboard = () => {
         <div className="stat-card">
           <div className="stat-card-header">
             <div className="stat-card-icon">
-              <i data-lucide="camera" style={{width: '24px', height: '24px'}}></i>
+              <Icon icon="heroicons:camera" style={{width: '24px', height: '24px', color: 'var(--color-blue)'}} />
             </div>
             <div className="stat-card-trend up">+8%</div>
           </div>
@@ -127,7 +116,7 @@ const Dashboard = () => {
         <div className="stat-card alert">
           <div className="stat-card-header">
             <div className="stat-card-icon">
-              <i data-lucide="alert-circle" style={{width: '24px', height: '24px'}}></i>
+              <Icon icon="heroicons:exclamation-circle" style={{width: '24px', height: '24px', color: 'var(--color-danger)'}} />
             </div>
             <div className="stat-card-trend down">-23%</div>
           </div>
@@ -138,7 +127,7 @@ const Dashboard = () => {
         <div className="stat-card">
           <div className="stat-card-header">
             <div className="stat-card-icon">
-              <i data-lucide="battery-charging" style={{width: '24px', height: '24px'}}></i>
+              <Icon icon="heroicons:battery-100" style={{width: '24px', height: '24px', color: 'var(--color-blue)'}} />
             </div>
             <div className="stat-card-trend up">+5%</div>
           </div>
@@ -187,7 +176,14 @@ const Dashboard = () => {
             {activities.map((activity, idx) => (
               <div key={idx} className={`activity-item ${activity.alert ? 'alert' : ''}`}>
                 <div className="activity-icon">
-                  <i data-lucide={activity.icon} style={{width: '16px', height: '16px'}}></i>
+                  <Icon
+                    icon={activity.icon}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      color: activity.alert ? 'var(--color-danger)' : 'var(--color-blue)'
+                    }}
+                  />
                 </div>
                 <div className="activity-content">
                   <div className="activity-title">{activity.title}</div>
@@ -203,7 +199,7 @@ const Dashboard = () => {
         <div className="panel emergency-panel">
           <div className="emergency-header">
             <div className="emergency-icon">
-              <i data-lucide="alert-triangle" style={{width: '24px', height: '24px'}}></i>
+              <Icon icon="heroicons:exclamation-triangle" style={{width: '24px', height: '24px', color: 'white'}} />
             </div>
             <h3 className="emergency-title">紧急告警</h3>
           </div>
@@ -227,11 +223,11 @@ const Dashboard = () => {
           </div>
           <div className="emergency-actions">
             <button className="btn btn-primary">
-              <i data-lucide="check-circle" style={{width: '14px', height: '14px'}}></i>
+              <Icon icon="heroicons:check-circle" style={{width: '14px', height: '14px'}} />
               <span>立即确认</span>
             </button>
             <button className="btn btn-secondary">
-              <i data-lucide="eye" style={{width: '14px', height: '14px'}}></i>
+              <Icon icon="heroicons:eye" style={{width: '14px', height: '14px'}} />
               <span>查看详情</span>
             </button>
           </div>
@@ -247,14 +243,14 @@ const Dashboard = () => {
               <div key={idx} className="access-item" onClick={() => handleAccessClick(item.path)}>
                 <div className="access-left">
                   <div className="access-icon">
-                    <i data-lucide={item.icon} style={{width: '18px', height: '18px'}}></i>
+                    <Icon icon={item.icon} style={{width: '18px', height: '18px', color: 'var(--color-blue)'}} />
                   </div>
                   <div className="access-text">
                     <div className="access-title">{item.title}</div>
                     <div className="access-desc">{item.desc}</div>
                   </div>
                 </div>
-                <i data-lucide="chevron-right" style={{width: '16px', height: '16px'}}></i>
+                <Icon icon="heroicons:chevron-right" style={{width: '16px', height: '16px', color: 'var(--color-text-muted)'}} />
               </div>
             ))}
           </div>

@@ -101,11 +101,11 @@ body {
   background: var(--color-danger-bg);
 }
 
-.stat-card-icon i {
+.stat-card-icon svg {
   color: var(--color-blue);
 }
 
-.stat-card.alert .stat-card-icon i {
+.stat-card.alert .stat-card-icon svg {
   color: var(--color-danger);
 }
 
@@ -497,11 +497,11 @@ body {
   background: var(--color-danger-bg);
 }
 
-.activity-icon i {
+.activity-icon svg {
   color: var(--color-blue);
 }
 
-.activity-item.alert .activity-icon i {
+.activity-item.alert .activity-icon svg {
   color: var(--color-danger);
 }
 
@@ -579,7 +579,7 @@ body {
   flex-shrink: 0;
 }
 
-.emergency-icon i {
+.emergency-icon svg {
   color: white;
 }
 
@@ -755,11 +755,11 @@ body {
   background: var(--color-blue);
 }
 
-.access-icon i {
+.access-icon svg {
   color: var(--color-blue);
 }
 
-.access-item:hover .access-icon i {
+.access-item:hover .access-icon svg {
   color: white;
 }
 

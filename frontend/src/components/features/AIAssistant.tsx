@@ -8,11 +8,6 @@ interface Message {
   content: string;
 }
 
-interface Position {
-  x: number;
-  y: number;
-}
-
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -22,31 +17,15 @@ const AIAssistant = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const messageIdCounter = useRef(2);
-  const positionRef = useRef<Position>({ x: 0, y: 0 });
-  const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
 
-  // 调试：确认代码已更新
-  useEffect(() => {
-    console.log('AIAssistant 组件已更新 - 使用唯一ID作为key');
-  }, []);
-
-  // 初始化位置（右下角）
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      // 初始位置设为右下角
-      positionRef.current = {
-        x: window.innerWidth - 384 - 24,
-        y: window.innerHeight - 600 - 24
-      };
-      
-      containerRef.current.style.left = `${positionRef.current.x}px`;
-      containerRef.current.style.top = `${positionRef.current.y}px`;
-    }
-  }, [isOpen]);
+  // 拖动状态全部用 ref，不触发重渲染
+  const isDraggingRef = useRef(false);
+  const posRef = useRef({ x: 0, y: 0 });
+  const offsetRef = useRef({ x: 0, y: 0 });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,72 +35,80 @@ const AIAssistant = () => {
     scrollToBottom();
   }, [messages]);
 
-  // 处理鼠标按下事件
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('textarea')) {
-      return;
+  // 容器挂载后立即设置初始位置（跟随圆形按钮当前位置）
+  const setContainerRef = (el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    if (el) {
+      // 以圆形按钮中心为基准，让面板右下角对齐按钮中心
+      const fabCenterX = fabPosRef.current.x + 32;
+      const fabCenterY = fabPosRef.current.y + 32;
+      let x = fabCenterX - 384;
+      let y = fabCenterY - 600;
+      // 确保不超出视口
+      x = Math.max(0, Math.min(x, window.innerWidth - 384));
+      y = Math.max(0, Math.min(y, window.innerHeight - 600));
+      posRef.current = { x, y };
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
     }
-    
-    e.preventDefault();
-    setIsDragging(true);
-    dragOffsetRef.current = {
-      x: e.clientX - positionRef.current.x,
-      y: e.clientY - positionRef.current.y
-    };
   };
 
-  // 处理鼠标移动事件
+  // 注册全局 mousemove / mouseup，组件挂载时绑定，卸载时清除
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !containerRef.current) return;
-
-      const newX = e.clientX - dragOffsetRef.current.x;
-      const newY = e.clientY - dragOffsetRef.current.y;
-
-      // 限制在视口范围内
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !containerRef.current) return;
+      const newX = e.clientX - offsetRef.current.x;
+      const newY = e.clientY - offsetRef.current.y;
       const maxX = window.innerWidth - 384;
-      const maxY = window.innerHeight - 600;
-
-      positionRef.current = {
+      const maxY = window.innerHeight - (containerRef.current.offsetHeight || 600);
+      posRef.current = {
         x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY))
+        y: Math.max(0, Math.min(newY, maxY)),
       };
-
-      // 使用 left/top 定位
-      containerRef.current.style.left = `${positionRef.current.x}px`;
-      containerRef.current.style.top = `${positionRef.current.y}px`;
+      containerRef.current.style.left = `${posRef.current.x}px`;
+      containerRef.current.style.top = `${posRef.current.y}px`;
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
+    const onMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      if (containerRef.current) {
+        containerRef.current.style.cursor = 'grab';
+      }
     };
 
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
     };
-  }, [isDragging]);
+  }, []);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('textarea')) return;
+    e.preventDefault();
+    isDraggingRef.current = true;
+    offsetRef.current = {
+      x: e.clientX - posRef.current.x,
+      y: e.clientY - posRef.current.y,
+    };
+    if (containerRef.current) {
+      containerRef.current.style.cursor = 'grabbing';
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
-
     const userMessage = input.trim();
     setInput('');
     setMessages(prev => [...prev, { id: String(messageIdCounter.current++), role: 'user', content: userMessage }]);
     setLoading(true);
-
     try {
       const response = await aiApi.analyzeDefect(userMessage);
       setMessages(prev => [...prev, { id: String(messageIdCounter.current++), role: 'assistant', content: String(response) }]);
     } catch (error: any) {
-      console.error('AI分析失败:', error);
       let errorMessage = '抱歉，AI分析服务暂时不可用。\n\n';
-      
       if (error.code === 'ECONNABORTED') {
         errorMessage += '错误：请求超时，请检查网络连接。';
       } else if (error.code === 'ERR_NETWORK') {
@@ -133,12 +120,7 @@ const AIAssistant = () => {
       } else {
         errorMessage += `错误：${error.message}`;
       }
-      
-      setMessages(prev => [...prev, { 
-        id: String(messageIdCounter.current++),
-        role: 'assistant', 
-        content: errorMessage
-      }]);
+      setMessages(prev => [...prev, { id: String(messageIdCounter.current++), role: 'assistant', content: errorMessage }]);
     } finally {
       setLoading(false);
     }
@@ -153,9 +135,7 @@ const AIAssistant = () => {
 
   const handleNewChat = () => {
     messageIdCounter.current = 2;
-    setMessages([
-      { id: '1', role: 'assistant', content: '你好！我是AI智能助手，可以帮你分析电力设备缺陷。请描述你遇到的问题。' }
-    ]);
+    setMessages([{ id: '1', role: 'assistant', content: '你好！我是AI智能助手，可以帮你分析电力设备缺陷。请描述你遇到的问题。' }]);
     setShowMenu(false);
   };
 
@@ -170,38 +150,78 @@ const AIAssistant = () => {
     setShowMenu(false);
   };
 
+  // 圆形按钮拖动相关 ref
+  const fabRef = useRef<HTMLDivElement | null>(null);
+  const fabPosRef = useRef({ x: window.innerWidth - 64 - 24, y: window.innerHeight - 64 - 24 });
+  const fabOffsetRef = useRef({ x: 0, y: 0 });
+  const fabDraggingRef = useRef(false);
+  const fabDidDragRef = useRef(false);
+
+  const setFabRef = (el: HTMLDivElement | null) => {
+    fabRef.current = el;
+    if (el) {
+      el.style.left = `${fabPosRef.current.x}px`;
+      el.style.top = `${fabPosRef.current.y}px`;
+    }
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!fabDraggingRef.current || !fabRef.current) return;
+      fabDidDragRef.current = true;
+      const newX = Math.max(0, Math.min(e.clientX - fabOffsetRef.current.x, window.innerWidth - 64));
+      const newY = Math.max(0, Math.min(e.clientY - fabOffsetRef.current.y, window.innerHeight - 64));
+      fabPosRef.current = { x: newX, y: newY };
+      fabRef.current.style.left = `${newX}px`;
+      fabRef.current.style.top = `${newY}px`;
+    };
+    const onUp = () => { fabDraggingRef.current = false; };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
   if (!isOpen) {
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-50 group animate-bounce"
+      <div
+        ref={setFabRef}
+        className="fixed w-16 h-16 bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 group animate-bounce"
         title="AI智能助手"
-        style={{ animationDuration: '2s' }}
+        style={{ animationDuration: '2s', cursor: 'grab', userSelect: 'none' }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          fabDraggingRef.current = true;
+          fabDidDragRef.current = false;
+          fabOffsetRef.current = {
+            x: e.clientX - fabPosRef.current.x,
+            y: e.clientY - fabPosRef.current.y,
+          };
+        }}
+        onClick={() => {
+          if (!fabDidDragRef.current) setIsOpen(true);
+        }}
       >
-        <Icon icon="mdi:robot-excited" className="text-3xl group-hover:scale-110 transition-transform" />
+        <Icon icon="mdi:robot-excited" className="text-3xl" />
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse border-2 border-white"></div>
         <div className="absolute inset-0 rounded-full bg-violet-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
-      </button>
+      </div>
     );
   }
 
   return (
-    <div 
-      ref={containerRef}
+    <div
+      ref={setContainerRef}
       className={`fixed bg-slate-900 border border-violet-500/30 rounded-2xl shadow-2xl z-50 ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
-      } ${
         isMinimized ? 'w-80 h-16' : 'w-96 h-[600px]'
       }`}
-      style={{
-        left: '0',
-        top: '0',
-        userSelect: isDragging ? 'none' : 'auto'
-      }}
+      style={{ cursor: 'grab', userSelect: 'none' }}
     >
-      {/* 头部 */}
-      <div 
-        className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-t-2xl px-4 flex items-center justify-between cursor-grab active:cursor-grabbing"
+      {/* 头部拖动区域 */}
+      <div
+        className="h-16 bg-gradient-to-r from-violet-600 to-purple-600 rounded-t-2xl px-4 flex items-center justify-between"
         onMouseDown={handleMouseDown}
         onClick={() => isMinimized && setIsMinimized(false)}
       >
@@ -211,18 +231,13 @@ const AIAssistant = () => {
           </div>
           <div>
             <h3 className="text-white font-bold text-sm">AI智能助手</h3>
-            <p className="text-violet-200 text-xs">
-              {loading ? '思考中...' : '在线'}
-            </p>
+            <p className="text-violet-200 text-xs">{loading ? '思考中...' : '在线'}</p>
           </div>
         </div>
         <div className="flex items-center space-x-1 pointer-events-auto">
           <div className="relative">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
               className="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
               title="更多"
             >
@@ -231,44 +246,31 @@ const AIAssistant = () => {
             {showMenu && (
               <div className="absolute top-10 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 w-36 z-10">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNewChat();
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleNewChat(); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center space-x-2"
                 >
-                  <Icon icon="heroicons:plus" className="" />
+                  <Icon icon="heroicons:plus" />
                   <span>新增对话</span>
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMessages([]);
-                    setShowMenu(false);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); setMessages([]); setShowMenu(false); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center space-x-2"
                 >
-                  <Icon icon="heroicons:trash" className="" />
+                  <Icon icon="heroicons:trash" />
                   <span>清空对话</span>
                 </button>
               </div>
             )}
           </div>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMinimize();
-            }}
+            onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
             className="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
             title="最小化"
           >
             <Icon icon="heroicons:minus" className="text-white" />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
+            onClick={(e) => { e.stopPropagation(); handleClose(); }}
             className="w-8 h-8 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
             title="关闭"
           >
@@ -280,7 +282,11 @@ const AIAssistant = () => {
       {!isMinimized && (
         <>
           {/* 消息区域 */}
-          <div className="h-[calc(100%-8rem)] overflow-y-auto p-4 space-y-4 bg-slate-950" onClick={() => setShowMenu(false)}>
+          <div
+            className="h-[calc(100%-8rem)] overflow-y-auto p-4 space-y-4 bg-slate-950"
+            style={{ userSelect: 'text', cursor: 'auto' }}
+            onClick={() => setShowMenu(false)}
+          >
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-slate-500">
                 <Icon icon="mdi:robot-excited-outline" className="text-6xl mb-4" />
@@ -288,17 +294,12 @@ const AIAssistant = () => {
               </div>
             )}
             {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                    msg.role === 'user'
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-slate-800 text-slate-200 border border-slate-700'
-                  }`}
-                >
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  msg.role === 'user'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-slate-800 text-slate-200 border border-slate-700'
+                }`}>
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                 </div>
               </div>
@@ -318,7 +319,11 @@ const AIAssistant = () => {
           </div>
 
           {/* 输入区域 */}
-          <div className="h-20 border-t border-slate-800 p-3 bg-slate-900" onClick={() => setShowMenu(false)}>
+          <div
+            className="h-20 border-t border-slate-800 p-3 bg-slate-900"
+            style={{ cursor: 'auto' }}
+            onClick={() => setShowMenu(false)}
+          >
             <div className="flex items-center space-x-2">
               <textarea
                 value={input}
@@ -327,6 +332,7 @@ const AIAssistant = () => {
                 placeholder="输入你的问题... (Shift+Enter换行)"
                 disabled={loading}
                 className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 resize-none disabled:opacity-50"
+                style={{ cursor: 'text', userSelect: 'text' }}
                 rows={2}
               />
               <button
@@ -352,5 +358,4 @@ const AIAssistant = () => {
 };
 
 export default AIAssistant;
-
-
+                  

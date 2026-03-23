@@ -34,17 +34,21 @@ const UAVManagement = () => {
         const data = await response.json();
         
         // 转换后端数据格式为前端格式
-        const formattedUavs = data.map((drone: any) => ({
-          id: drone.droneId,
-          name: drone.name,
-          status: mapDroneStatus(drone.status),
-          battery: drone.batteryLevel || 0,
-          location: { lat: drone.latitude || 0, lon: drone.longitude || 0 },
-          altitude: 0,
-          speed: 0,
-          task: drone.currentLocation ? `${drone.currentLocation} 巡检任务` : undefined,
-          lastUpdate: new Date().toLocaleTimeString('zh-CN')
-        }));
+        const formattedUavs = data.map((drone: any) => {
+          const isWorking = mapDroneStatus(drone.status) === 'working';
+          // working 状态无人机随机初始化飞行高度 [80,150]m，速度 [30,65]km/h
+          return {
+            id: drone.droneId,
+            name: drone.name,
+            status: mapDroneStatus(drone.status),
+            battery: drone.batteryLevel || 0,
+            location: { lat: drone.latitude || 0, lon: drone.longitude || 0 },
+            altitude: isWorking ? Math.round(80 + Math.random() * 70) : 0,
+            speed: isWorking ? Math.round(30 + Math.random() * 35) : 0,
+            task: drone.currentLocation ? `${drone.currentLocation} 巡检任务` : undefined,
+            lastUpdate: new Date().toLocaleTimeString('zh-CN')
+          };
+        });
         
         setUavs(formattedUavs);
       } catch (err) {
@@ -77,16 +81,26 @@ const UAVManagement = () => {
       setUavs(prevUavs => 
         prevUavs.map(uav => {
           if (uav.status === 'working' && uav.battery > 0) {
+            // 高度在 [80,150]m 区间内小幅随机波动 ±3m
+            const newAltitude = Math.min(150, Math.max(80,
+              uav.altitude + (Math.random() - 0.5) * 6
+            ));
+            // 速度在 [30,65]km/h 区间内小幅随机波动 ±2km/h
+            const newSpeed = Math.min(65, Math.max(30,
+              uav.speed + (Math.random() - 0.5) * 4
+            ));
             return {
               ...uav,
               battery: Math.max(0, uav.battery - Math.random() * 0.5),
+              altitude: Math.round(newAltitude),
+              speed: Math.round(newSpeed),
               lastUpdate: new Date().toLocaleTimeString('zh-CN')
             };
           }
           return uav;
         })
       );
-    }, 5000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);

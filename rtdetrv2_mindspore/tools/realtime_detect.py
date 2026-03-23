@@ -891,6 +891,12 @@ def run_detection_dualbuffer(args):
                             'has_defect': has_defect1, 'detections': dets1},
                 'stream2': {'frame_idx': idx2, 'timestamp_sec': round(ts2, 4),
                             'has_defect': has_defect2, 'detections': dets2},
+                'location': {
+                    'latitude':  args.lat       if args.lat       is not None else None,
+                    'longitude': args.lon       if args.lon       is not None else None,
+                    'altitude':  args.altitude  if args.altitude  is not None else None,
+                    'drone_id':  args.drone_id  if args.drone_id  is not None else None,
+                },
             }
 
             if has_defect:
@@ -1156,6 +1162,12 @@ def run_detection(args):
             'has_defect':      has_defect,
             'detection_count': len(detections),
             'detections':      detections,
+            'location': {
+                'latitude':  args.lat       if args.lat       is not None else None,
+                'longitude': args.lon       if args.lon       is not None else None,
+                'altitude':  args.altitude  if args.altitude  is not None else None,
+                'drone_id':  args.drone_id  if args.drone_id  is not None else None,
+            },
         }
         if detections:
             all_results.append(frame_result)
@@ -1361,6 +1373,19 @@ def parse_args():
                             '两路最新帧推理，实现低延迟时间对齐并缓解输入压力。\n'
                             '需同时指定 --video-path（可见光）和 --video-path-2（红外）。'
                         ))
+    # ---- 位置信息参数（附加到输出 JSON） ----
+    parser.add_argument('--lat',       type=float, default=None,
+                        dest='lat',
+                        help='无人机当前纬度（度），写入输出 JSON 的 location 字段')
+    parser.add_argument('--lon',       type=float, default=None,
+                        dest='lon',
+                        help='无人机当前经度（度），写入输出 JSON 的 location 字段')
+    parser.add_argument('--altitude',  type=float, default=None,
+                        dest='altitude',
+                        help='无人机当前飞行高度（米），写入输出 JSON 的 location 字段')
+    parser.add_argument('--drone-id',  type=str, default=None,
+                        dest='drone_id',
+                        help='无人机 ID，写入输出 JSON，便于后端关联')
     return parser.parse_args()
 
 
