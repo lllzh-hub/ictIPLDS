@@ -62,3 +62,13 @@ yarn.lock
 dataset/
 data/
 *.zip
+
+# 软著文档与生成脚本
+*.docx
+~$*
+generate_copyright_code.py
+rename_system.py
+rename_sys.py
+
+# Java 编译产物
+backend/target/

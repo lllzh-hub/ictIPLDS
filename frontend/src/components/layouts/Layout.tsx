@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../common/Icon';
 
 interface LayoutProps {
@@ -9,7 +9,20 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [avatarError, setAvatarError] = useState(false);
+
+  const authData = (() => {
+    try {
+      const raw = sessionStorage.getItem('gridEyeAuth');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('gridEyeAuth');
+    navigate('/login', { replace: true });
+  };
 
   const menuItems = [
     { path: '/', label: '态势感知驾驶舱', icon: 'material-symbols:dashboard-outline' },
@@ -44,7 +57,7 @@ const Layout = ({ children }: LayoutProps) => {
               <h1 className="text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
               Grid Eye
             </h1>
-              <p className="text-xs text-slate-500 font-mono">智能电网监测系统</p>
+              <p className="text-xs text-slate-500 font-mono">基于MindSpore的电力缺陷检测系统</p>
             </div>
           </div>
         </div>
@@ -135,10 +148,18 @@ const Layout = ({ children }: LayoutProps) => {
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-slate-200">管理员</span>
-                <span className="text-xs text-slate-500 font-mono">Admin</span>
+                <span className="text-sm font-semibold text-slate-200">{authData?.role || '管理员'}</span>
+                <span className="text-xs text-slate-500 font-mono">{authData?.username || 'Admin'}</span>
               </div>
             </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-sm text-slate-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
+              title="退出登录"
+            >
+              <Icon icon="heroicons:arrow-right-on-rectangle" className="text-lg" />
+              <span>退出</span>
+            </button>
           </div>
         </header>
 
