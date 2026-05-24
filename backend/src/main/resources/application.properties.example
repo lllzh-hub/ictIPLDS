@@ -9,13 +9,13 @@ server.tomcat.max-http-form-post-size=100MB
 # 如果使用 MobaXterm SSH 隧道，可能需要修改端口为 3307
 # 注意：characterEncoding 使用 UTF-8（Java 支持的名称），MySQL 会自动转换为 utf8mb4
 spring.datasource.url=jdbc:mysql://localhost:3306/power_inspection?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&collation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true
-# 根据 MobaXterm 的配置修改用户名密码
 spring.datasource.username=root
-spring.datasource.password=123456
+spring.datasource.password=YOUR_DB_PASSWORD
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 # JPA 配置
 spring.jpa.hibernate.ddl-auto=update
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
 spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.format_sql=false
 
@@ -32,12 +32,9 @@ server.servlet.encoding.force-request=true
 server.servlet.encoding.force-response=true
 
 # 华为云 ModelArts API 配置
-# API Key (X-Auth-Token)
-huaweicloud.api.key=Nh5OLssFNQPpoXyWQiJrl8QlepTbI37937ZRfYKwoLY_i3T8k-liLWNQ15OoPa2SkBfwgSjAP8CNo5RvUWNn-A
-# 端点地址
-huaweicloud.endpoint=http://api-cn-southwest-2.modelarts-infer.com/v2/infer/d52e9fee-e893-4acf-aac1-031e7c1db7bd/v1/chat/completions
-# 服务ID
-huaweicloud.service.id=d52e9fee-e893-4acf-aac1-031e7c1db7bd
+huaweicloud.api.key=YOUR_HUAWEI_CLOUD_API_KEY
+huaweicloud.endpoint=http://api-cn-southwest-2.modelarts-infer.com/v2/infer/YOUR_SERVICE_ID/v1/chat/completions
+huaweicloud.service.id=YOUR_SERVICE_ID
 
 # 日志配置
 logging.level.com.powerinspection=INFO
@@ -51,15 +48,17 @@ defect.import.folder=D:/Desktop/example_responses
 
 # SFTP 远程连接配置（使用密码认证）
 sftp.enabled=true
-sftp.host=10.19.42.4
+sftp.host=YOUR_SFTP_HOST
 sftp.port=22
-sftp.username=HwHiAiUser
-sftp.password=Mind@123
-# 使用密码认证，不需要私钥
+sftp.username=YOUR_SFTP_USERNAME
+sftp.password=YOUR_SFTP_PASSWORD
 sftp.private.key.path=
-sftp.remote.path=/home/HwHiAiUser/rtdetrv2_mindspore/results/dual_detection/
+sftp.remote.path=/home/YOUR_USER/rtdetrv2_mindspore/results/dual_detection/
 
 # 自动导入配置
 auto.import.enabled=true
-# 扫描间隔（毫秒），默认30秒
 auto.import.interval=30000
+
+# 官方验证码配置（注册/找回密码）
+auth.official.registration-code=YOUR_REGISTRATION_CODE
+auth.official.reset-code=YOUR_RESET_CODE

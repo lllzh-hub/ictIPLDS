@@ -72,3 +72,6 @@ rename_sys.py
 
 # Java 编译产物
 backend/target/
+
+# 本地敏感配置（请复制 application.properties.example 后填写）
+backend/src/main/resources/application.properties
